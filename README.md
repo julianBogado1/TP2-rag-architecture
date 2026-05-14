@@ -1,2 +1,12 @@
-# TP2-rag-architecture
-This project is an implementation of a RAG architecture LLM pipeline that recommends songs based on a natural language input prompt from the user
+# tp2-rag-arquitecture
+In this project we set to implement an LLM with RAG arquitecture
+
+# Scripts
+to run scripts first activate the virtual environment
+
+`source .venv/bin/activate`
+
+### Populate MongoDB
+To create test users we execute the following command:
+
+`python scripts/seed_users.py`
