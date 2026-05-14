@@ -5,7 +5,7 @@ from app.models.dataset_song_dto import DatasetSongDTO
 from app.persistence.mongo import dataset_repository
 
 
-@dataclass
+@dataclass(frozen=True)
 class IngestResult:
     total_inserted: int
     batches: int
@@ -16,6 +16,8 @@ class IngestService:
         self._db = db
 
     def run(self, max_songs: int, batch_size: int = 500) -> IngestResult:
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be >= 1, got {batch_size}")
         dataset_repository.drop_collection(self._db)
 
         stream = load_dataset(
