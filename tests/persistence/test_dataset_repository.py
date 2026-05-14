@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 from app.models.dataset_song_dto import DatasetSongDTO
-from app.persistence.mongo import dataset_repository
+from app.persistence.mongo.dataset_repository import DatasetRepository
 
 
 def _song(**kwargs) -> DatasetSongDTO:
@@ -11,32 +11,37 @@ def _song(**kwargs) -> DatasetSongDTO:
     return DatasetSongDTO(**(defaults | kwargs))
 
 
-def test_insert_many_songs_returns_inserted_count():
+def _repo(inserted_ids=None) -> tuple[DatasetRepository, MagicMock]:
     db = MagicMock()
-    db["dataset"].insert_many.return_value.inserted_ids = [1, 2, 3]
+    if inserted_ids is not None:
+        db["dataset"].insert_many.return_value.inserted_ids = inserted_ids
+    return DatasetRepository(db), db
+
+
+def test_insert_many_songs_returns_inserted_count():
+    repo, db = _repo(inserted_ids=[1, 2, 3])
     songs = [_song(song_id=i) for i in range(3)]
 
-    result = dataset_repository.insert_many_songs(db, songs)
+    result = repo.insert_many_songs(songs)
 
     assert result == 3
     db["dataset"].insert_many.assert_called_once()
 
 
 def test_insert_many_songs_empty_list_returns_zero():
-    db = MagicMock()
+    repo, db = _repo()
 
-    result = dataset_repository.insert_many_songs(db, [])
+    result = repo.insert_many_songs([])
 
     assert result == 0
     db["dataset"].insert_many.assert_not_called()
 
 
 def test_insert_many_songs_serialises_to_dicts():
-    db = MagicMock()
-    db["dataset"].insert_many.return_value.inserted_ids = [1]
+    repo, db = _repo(inserted_ids=[1])
     song = _song(song_id=99, title="My Song")
 
-    dataset_repository.insert_many_songs(db, [song])
+    repo.insert_many_songs([song])
 
     call_args = db["dataset"].insert_many.call_args[0][0]
     assert call_args[0]["song_id"] == 99
@@ -44,18 +49,18 @@ def test_insert_many_songs_serialises_to_dicts():
 
 
 def test_drop_collection_calls_drop():
-    db = MagicMock()
+    repo, db = _repo()
 
-    dataset_repository.drop_collection(db)
+    repo.drop_collection()
 
     db["dataset"].drop.assert_called_once()
 
 
 def test_count_returns_document_count():
-    db = MagicMock()
+    repo, db = _repo()
     db["dataset"].count_documents.return_value = 42
 
-    result = dataset_repository.count(db)
+    result = repo.count()
 
     assert result == 42
     db["dataset"].count_documents.assert_called_once_with({})

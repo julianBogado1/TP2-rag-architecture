@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pymongo.database import Database
 from datasets import load_dataset
 from app.models.dataset_song_dto import DatasetSongDTO
-from app.persistence.mongo import dataset_repository
+from app.persistence.mongo.dataset_repository import DatasetRepository
 
 
 @dataclass(frozen=True)
@@ -13,12 +13,12 @@ class IngestResult:
 
 class IngestService:
     def __init__(self, db: Database) -> None:
-        self._db = db
+        self._repository = DatasetRepository(db)
 
     def run(self, max_songs: int, batch_size: int = 500) -> IngestResult:
         if batch_size < 1:
             raise ValueError(f"batch_size must be >= 1, got {batch_size}")
-        dataset_repository.drop_collection(self._db)
+        self._repository.drop_collection()
 
         stream = load_dataset(
             "sebastiandizon/genius-song-lyrics",
@@ -48,13 +48,13 @@ class IngestService:
             ))
 
             if len(batch) >= batch_size:
-                total_inserted += dataset_repository.insert_many_songs(self._db, batch)
+                total_inserted += self._repository.insert_many_songs(batch)
                 batches += 1
                 print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs})")
                 batch = []
 
         if batch:
-            total_inserted += dataset_repository.insert_many_songs(self._db, batch)
+            total_inserted += self._repository.insert_many_songs(batch)
             batches += 1
             print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs})")
 
