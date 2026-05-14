@@ -26,7 +26,13 @@ def main() -> None:
         print("Usage: ingest_songs.py <max_songs>")
         sys.exit(1)
 
-    max_songs = int(sys.argv[1])
+    try:
+        max_songs = int(sys.argv[1])
+        if max_songs < 1:
+            raise ValueError
+    except ValueError:
+        print("Error: <max_songs> must be a positive integer")
+        sys.exit(1)
     client = MongoClient(MONGO_URI)
     db = client[MONGO_DB_NAME]
 
