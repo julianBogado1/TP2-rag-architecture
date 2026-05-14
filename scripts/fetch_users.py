@@ -1,19 +1,27 @@
 #!/usr/bin/env python3
+import sys
 import asyncio
-from app.persistence.mongo.database import connect, disconnect
-from app.persistence.mongo.user_profile_repository import get_by_user_id
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from app.persistence.mongo.database import MongoDatabase
+from app.persistence.mongo.user_profile_repository import UserProfileRepository
 
 
 async def main():
-    await connect()
+    mongo = MongoDatabase()
+    await mongo.connect()
+    repo = UserProfileRepository(mongo.get_db())
     for i in range(1, 11):
         user_id = f"user_{i:03d}"
-        user = await get_by_user_id(user_id)
+        user = await repo.get_by_user_id(user_id)
         if user:
             print(user)
         else:
             print(f"{user_id}: not found")
-    await disconnect()
+    await mongo.disconnect()
 
 
 if __name__ == "__main__":

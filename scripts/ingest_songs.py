@@ -10,11 +10,14 @@ Example:
 
 import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
 from dotenv import dotenv_values
 from pymongo import MongoClient
 from app.services.ingest_service import IngestService
 
-ROOT = Path(__file__).resolve().parent.parent
 config = dotenv_values(ROOT / ".env")
 
 MONGO_URI = config["MONGO_URI"]

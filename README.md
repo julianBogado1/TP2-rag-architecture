@@ -42,3 +42,9 @@ Example — ingest the first 5 000 songs:
 ```bash
 .venv/bin/python scripts/ingest_songs.py 5000
 ```
+
+### Fetch songs from mongoDB
+
+```bash
+.venv/bin/python scripts/fetch_songs.py
+```
