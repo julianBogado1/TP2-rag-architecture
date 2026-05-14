@@ -7,3 +7,4 @@ pydantic-settings==2.14.1
 python-dotenv==1.2.2
 httpx==0.28.1
 pytest==9.0.3
+datasets
