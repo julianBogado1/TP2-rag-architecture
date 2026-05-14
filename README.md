@@ -30,3 +30,15 @@ The API will be available at `http://localhost:8000`. Interactive docs at `http:
 ```bash
 .venv/bin/python scripts/seed_users.py
 ```
+
+### Ingest songs dataset
+
+```bash
+.venv/bin/python scripts/ingest_songs.py <max_songs>
+```
+
+Example — ingest the first 5 000 songs:
+
+```bash
+.venv/bin/python scripts/ingest_songs.py 5000
+```
