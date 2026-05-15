@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.persistence.mongo.database import MongoDatabase
 from app.persistence.mongo.user_profile_repository import UserProfileRepository
+from app.controllers.indexing_controller import router as indexing_router
 
 
 @asynccontextmanager
@@ -21,3 +22,4 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(indexing_router)

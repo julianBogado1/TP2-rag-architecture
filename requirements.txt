@@ -8,3 +8,9 @@ python-dotenv==1.2.2
 httpx==0.28.1
 pytest==9.0.3
 datasets==4.8.5
+langchain
+langchain-community
+langchain-text-splitters
+langchain-huggingface
+pinecone
+sentence-transformers

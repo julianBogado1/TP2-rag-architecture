@@ -12,6 +12,6 @@ docker run -d \
   -e MONGO_INITDB_ROOT_USERNAME="${MONGO_USER}" \
   -e MONGO_INITDB_ROOT_PASSWORD="${MONGO_PASS}" \
   -v mongo-rag-data:/data/db \
-  mongo:latest
+  mongo:7
 
 echo "MongoDB running on port ${MONGO_PORT} (user: ${MONGO_USER})"
