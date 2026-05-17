@@ -25,26 +25,28 @@ The API will be available at `http://localhost:8000`. Interactive docs at `http:
 
 # Scripts
 
-### Populate MongoDB
+### Seed user profiles
 
 ```bash
 .venv/bin/python scripts/seed_users.py
 ```
 
-### Ingest songs dataset
+### Ingest joined songs dataset
+
+Streams the full Spotify tracks dataset into memory, then streams Genius song lyrics up to `<max_songs>`, joining both by title and artist. Results are stored in the `songs` collection with Spotify audio features populated where a match exists and `null` otherwise.
 
 ```bash
-.venv/bin/python scripts/ingest_songs.py <max_songs>
+.venv/bin/python scripts/ingest_songs_joined.py <max_songs>
 ```
 
 Example — ingest the first 5 000 songs:
 
 ```bash
-.venv/bin/python scripts/ingest_songs.py 5000
+.venv/bin/python scripts/ingest_songs_joined.py 5000
 ```
 
-### Fetch songs from mongoDB
+# Tests
 
 ```bash
-.venv/bin/python scripts/fetch_songs.py
+.venv/bin/python -m pytest tests/ -v
 ```

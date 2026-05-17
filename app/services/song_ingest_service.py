@@ -22,6 +22,8 @@ class SongIngestService:
 
         spotify_lookup: dict[tuple[str, str], dict] = {}
         for row in load_dataset("maharshipandya/spotify-tracks-dataset", split="train", streaming=True):
+            if row["track_name"] is None or row["artists"] is None:
+                continue
             key = (row["track_name"].lower(), row["artists"].lower())
             spotify_lookup[key] = row
 
@@ -36,42 +38,46 @@ class SongIngestService:
             if i >= max_songs:
                 break
 
-            key = (row["title"].lower(), row["artist"].lower())
-            sp = spotify_lookup.get(key)
-            if sp:
-                spotify_matches += 1
+            try:
+                key = (row["title"].lower(), row["artist"].lower())
+                sp = spotify_lookup.get(key)
+                if sp:
+                    spotify_matches += 1
 
-            batch.append(SongDocument(
-                song_id=row["id"],
-                title=row["title"],
-                tag=row["tag"],
-                artist=row["artist"],
-                year=row["year"],
-                views=row["views"],
-                features=row.get("features"),
-                lyrics=row["lyrics"],
-                language_cld3=row.get("language_cld3"),
-                language_ft=row.get("language_ft"),
-                language=row.get("language"),
-                track_id=sp["track_id"] if sp else None,
-                album_name=sp["album_name"] if sp else None,
-                popularity=sp["popularity"] if sp else None,
-                duration_ms=sp["duration_ms"] if sp else None,
-                explicit=sp["explicit"] if sp else None,
-                danceability=sp["danceability"] if sp else None,
-                energy=sp["energy"] if sp else None,
-                key=sp["key"] if sp else None,
-                loudness=sp["loudness"] if sp else None,
-                mode=sp["mode"] if sp else None,
-                speechiness=sp["speechiness"] if sp else None,
-                acousticness=sp["acousticness"] if sp else None,
-                instrumentalness=sp["instrumentalness"] if sp else None,
-                liveness=sp["liveness"] if sp else None,
-                valence=sp["valence"] if sp else None,
-                tempo=sp["tempo"] if sp else None,
-                time_signature=sp["time_signature"] if sp else None,
-                track_genre=sp["track_genre"] if sp else None,
-            ))
+                batch.append(SongDocument(
+                    song_id=row["id"],
+                    title=row["title"],
+                    tag=row["tag"],
+                    artist=row["artist"],
+                    year=row["year"],
+                    views=row["views"],
+                    features=row.get("features"),
+                    lyrics=row["lyrics"],
+                    language_cld3=row.get("language_cld3"),
+                    language_ft=row.get("language_ft"),
+                    language=row.get("language"),
+                    track_id=sp["track_id"] if sp else None,
+                    album_name=sp["album_name"] if sp else None,
+                    popularity=sp["popularity"] if sp else None,
+                    duration_ms=sp["duration_ms"] if sp else None,
+                    explicit=sp["explicit"] if sp else None,
+                    danceability=sp["danceability"] if sp else None,
+                    energy=sp["energy"] if sp else None,
+                    key=sp["key"] if sp else None,
+                    loudness=sp["loudness"] if sp else None,
+                    mode=sp["mode"] if sp else None,
+                    speechiness=sp["speechiness"] if sp else None,
+                    acousticness=sp["acousticness"] if sp else None,
+                    instrumentalness=sp["instrumentalness"] if sp else None,
+                    liveness=sp["liveness"] if sp else None,
+                    valence=sp["valence"] if sp else None,
+                    tempo=sp["tempo"] if sp else None,
+                    time_signature=sp["time_signature"] if sp else None,
+                    track_genre=sp["track_genre"] if sp else None,
+                ))
+            except Exception as e:
+                print(f"Skipping row {i}: {e}")
+                continue
 
             if len(batch) >= batch_size:
                 batches += 1
