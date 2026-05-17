@@ -74,14 +74,20 @@ class SongIngestService:
             ))
 
             if len(batch) >= batch_size:
-                total_inserted += self._repository.insert_many(batch)
                 batches += 1
-                print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs}, matches: {spotify_matches})")
+                try:
+                    total_inserted += self._repository.insert_many(batch)
+                    print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs}, matches: {spotify_matches})")
+                except Exception as e:
+                    print(f"Error in batch {batches}: {e}")
                 batch = []
 
         if batch:
-            total_inserted += self._repository.insert_many(batch)
             batches += 1
-            print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs}, matches: {spotify_matches})")
+            try:
+                total_inserted += self._repository.insert_many(batch)
+                print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs}, matches: {spotify_matches})")
+            except Exception as e:
+                print(f"Error in batch {batches}: {e}")
 
         return SongIngestResult(total_inserted=total_inserted, batches=batches, spotify_matches=spotify_matches)
