@@ -156,3 +156,27 @@ def test_run_empty_genius_stream_returns_zero():
     assert result.total_inserted == 0
     assert result.batches == 0
     assert result.spotify_matches == 0
+
+
+def test_run_continues_on_batch_insert_error():
+    db = MagicMock()
+    db["songs"].insert_many.side_effect = Exception("DB error")
+    genius = [_genius_row(i) for i in range(4)]
+
+    with patch("app.services.song_ingest_service.load_dataset", side_effect=[iter([]), iter(genius)]):
+        result = SongIngestService(db).run(max_songs=4, batch_size=2)
+
+    assert result.batches == 2
+    assert result.total_inserted == 0
+
+
+def test_run_remainder_batch_handles_insert_error():
+    db = MagicMock()
+    db["songs"].insert_many.side_effect = Exception("DB error")
+    genius = [_genius_row(i) for i in range(3)]
+
+    with patch("app.services.song_ingest_service.load_dataset", side_effect=[iter([]), iter(genius)]):
+        result = SongIngestService(db).run(max_songs=3, batch_size=10)
+
+    assert result.batches == 1
+    assert result.total_inserted == 0
