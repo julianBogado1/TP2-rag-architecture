@@ -1,53 +1,54 @@
 from unittest.mock import MagicMock
-from app.models.dataset_song_dto import DatasetSongDTO
-from app.persistence.mongo.dataset_repository import DatasetRepository
+from app.models.song_document import SongDocument
+from app.persistence.mongo.song_repository import SongRepository
 
 
-def _song(**kwargs) -> DatasetSongDTO:
+def _song(**kwargs) -> SongDocument:
     defaults = dict(
         song_id=1, title="T", tag="rap", artist="A",
         year=2020, views=0, lyrics="lyrics",
     )
-    return DatasetSongDTO(**(defaults | kwargs))
+    return SongDocument(**(defaults | kwargs))
 
 
-def _repo() -> tuple[DatasetRepository, MagicMock]:
+def _repo() -> tuple[SongRepository, MagicMock]:
     collection = MagicMock()
     db = MagicMock()
     db.__getitem__.return_value = collection
-    return DatasetRepository(db), collection
+    return SongRepository(db), collection
 
 
-def test_insert_many_songs_returns_inserted_count():
+def test_insert_many_returns_inserted_count():
     repo, col = _repo()
     col.insert_many.return_value.inserted_ids = [1, 2, 3]
     songs = [_song(song_id=i) for i in range(3)]
 
-    result = repo.insert_many_songs(songs)
+    result = repo.insert_many(songs)
 
     assert result == 3
     col.insert_many.assert_called_once()
 
 
-def test_insert_many_songs_empty_list_returns_zero():
+def test_insert_many_empty_list_returns_zero():
     repo, col = _repo()
 
-    result = repo.insert_many_songs([])
+    result = repo.insert_many([])
 
     assert result == 0
     col.insert_many.assert_not_called()
 
 
-def test_insert_many_songs_serialises_to_dicts():
+def test_insert_many_serialises_to_dicts():
     repo, col = _repo()
     col.insert_many.return_value.inserted_ids = [1]
     song = _song(song_id=99, title="My Song")
 
-    repo.insert_many_songs([song])
+    repo.insert_many([song])
 
     call_args = col.insert_many.call_args[0][0]
     assert call_args[0]["song_id"] == 99
     assert call_args[0]["title"] == "My Song"
+    assert call_args[0]["track_id"] is None
 
 
 def test_drop_collection_calls_drop():
@@ -60,11 +61,11 @@ def test_drop_collection_calls_drop():
 
 def test_count_returns_document_count():
     repo, col = _repo()
-    col.count_documents.return_value = 42
+    col.count_documents.return_value = 7
 
     result = repo.count()
 
-    assert result == 42
+    assert result == 7
     col.count_documents.assert_called_once_with({})
 
 
@@ -83,13 +84,13 @@ def test_get_all_returns_all_songs():
 
 def test_get_by_id_returns_song():
     repo, col = _repo()
-    col.find_one.return_value = _song(song_id=38, title="Barry Bonds").model_dump()
+    col.find_one.return_value = _song(song_id=38, title="Stronger").model_dump()
 
     result = repo.get_by_id(38)
 
     assert result is not None
     assert result.song_id == 38
-    assert result.title == "Barry Bonds"
+    assert result.title == "Stronger"
     col.find_one.assert_called_once_with({"song_id": 38}, {"_id": 0})
 
 
@@ -105,8 +106,8 @@ def test_get_by_id_returns_none_when_not_found():
 def test_get_by_artist_returns_list():
     repo, col = _repo()
     col.find.return_value = [
-        _song(artist="Kanye West", title="Gold Digger").model_dump(),
         _song(artist="Kanye West", title="Stronger").model_dump(),
+        _song(artist="Kanye West", title="Gold Digger").model_dump(),
     ]
 
     results = repo.get_by_artist("Kanye West")
@@ -128,21 +129,10 @@ def test_get_by_genre_queries_tag_field():
 
 def test_get_by_year_returns_list():
     repo, col = _repo()
-    col.find.return_value = [_song(year=2007, title="Stronger").model_dump()]
+    col.find.return_value = [_song(year=2007).model_dump()]
 
     results = repo.get_by_year(2007)
 
     assert len(results) == 1
     assert results[0].year == 2007
     col.find.assert_called_once_with({"year": 2007}, {"_id": 0})
-
-
-def test_get_by_title_returns_list():
-    repo, col = _repo()
-    col.find.return_value = [_song(title="Stronger").model_dump()]
-
-    results = repo.get_by_title("Stronger")
-
-    assert len(results) == 1
-    assert results[0].title == "Stronger"
-    col.find.assert_called_once_with({"title": "Stronger"}, {"_id": 0})
