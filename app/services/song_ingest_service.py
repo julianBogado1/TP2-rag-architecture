@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pymongo.database import Database
 from datasets import load_dataset
+from tqdm import tqdm
 from app.models.song_document import SongDocument
 from app.persistence.mongo.song_repository import SongRepository
 
@@ -34,7 +35,10 @@ class SongIngestService:
         batches = 0
         spotify_matches = 0
 
-        for i, row in enumerate(load_dataset("sebastiandizon/genius-song-lyrics", split="train", streaming=True)):
+        genius = load_dataset("sebastiandizon/genius-song-lyrics", split="train", streaming=True)
+        progress = tqdm(genius, total=max_songs, desc="Ingesting songs", unit="song")
+
+        for i, row in enumerate(progress):
             if i >= max_songs:
                 break
 
@@ -43,6 +47,7 @@ class SongIngestService:
                 sp = spotify_lookup.get(key)
                 if sp:
                     spotify_matches += 1
+                    progress.set_postfix(matches=spotify_matches, inserted=total_inserted)
 
                 batch.append(SongDocument(
                     song_id=row["id"],
@@ -83,17 +88,17 @@ class SongIngestService:
                 batches += 1
                 try:
                     total_inserted += self._repository.insert_many(batch)
-                    print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs}, matches: {spotify_matches})")
+                    progress.set_postfix(matches=spotify_matches, inserted=total_inserted)
                 except Exception as e:
-                    print(f"Error in batch {batches}: {e}")
+                    tqdm.write(f"Error in batch {batches}: {e}")
                 batch = []
 
         if batch:
             batches += 1
             try:
                 total_inserted += self._repository.insert_many(batch)
-                print(f"Inserted batch {batches} (total: {total_inserted} / {max_songs}, matches: {spotify_matches})")
+                progress.set_postfix(matches=spotify_matches, inserted=total_inserted)
             except Exception as e:
-                print(f"Error in batch {batches}: {e}")
+                tqdm.write(f"Error in batch {batches}: {e}")
 
         return SongIngestResult(total_inserted=total_inserted, batches=batches, spotify_matches=spotify_matches)

@@ -14,3 +14,4 @@ langchain-text-splitters
 langchain-huggingface
 pinecone
 sentence-transformers
+tqdm

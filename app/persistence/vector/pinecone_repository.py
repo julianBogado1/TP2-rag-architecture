@@ -26,6 +26,9 @@ class PineconeRepository:
     def upsert_batch(self, records: list[tuple[str, list[float], dict]]) -> None:
         self._index.upsert(vectors=records)
 
+    def clear(self) -> None:
+        self._index.delete(delete_all=True)
+
     def query(self, embedding: list[float], top_k: int = 5) -> list[Document]:
         results = self._index.query(vector=embedding, top_k=top_k, include_metadata=True)
         return [

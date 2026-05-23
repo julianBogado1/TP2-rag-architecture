@@ -16,17 +16,19 @@ class EmbedderService:
         vector_repo: PineconeRepository,
         model_name: str = DEFAULT_MODEL,
         device: str = "cpu",
+        batch_size: int = 100,
     ) -> None:
         self._vector_repo = vector_repo
+        self._batch_size = batch_size
         self._embeddings = HuggingFaceEmbeddings(
             model_name=model_name,
             model_kwargs={"device": device},
         )
 
-    def embed_and_index(self, chunks: list[Document], batch_size: int = 100) -> int:
+    def embed_and_index(self, chunks: list[Document]) -> int:
         total = 0
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i : i + batch_size]
+        for i in range(0, len(chunks), self._batch_size):
+            batch = chunks[i : i + self._batch_size]
             texts = [chunk.page_content for chunk in batch]
             vectors = self._embeddings.embed_documents(texts)
             records = [
