@@ -32,11 +32,30 @@ class PineconeRepository:
 
     def query(self, vector: list[float], top_k: int) -> list[RawPineconeMatch]:
         result = self._index.query(vector=vector, top_k=top_k, include_metadata=True)
+        matches = _extract_matches(result)
         return [
             RawPineconeMatch(
-                chunk_id=m["id"],
-                score=m["score"],
-                metadata=m.get("metadata") or {},
+                chunk_id=_get(m, "id"),
+                score=_get(m, "score"),
+                metadata=_get(m, "metadata") or {},
             )
-            for m in result.get("matches", [])
+            for m in matches
         ]
+
+
+def _extract_matches(result):
+    """Pinecone SDK v3+ returns a QueryResponse object with .matches; earlier
+    versions returned a dict. Handle both."""
+    matches = getattr(result, "matches", None)
+    if matches is not None:
+        return matches
+    if hasattr(result, "get"):
+        return result.get("matches", [])
+    return []
+
+
+def _get(item, key):
+    """Read a key from a Pinecone match item that may be a dict OR an object."""
+    if isinstance(item, dict):
+        return item.get(key)
+    return getattr(item, key, None)

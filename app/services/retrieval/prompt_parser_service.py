@@ -9,8 +9,18 @@ infer plausible target values (happy upbeat prompt -> high valence/energy/dance;
 melancholic prompt -> low valence, low energy, high acousticness). Set
 semantic_query to a clean English rephrasing optimized for embedding search:
 strip emojis, fix Spanglish, expand abbreviations. Extract any explicit
-artist/genre/language mentions; otherwise leave them null. Never invent data the
-user didn't imply: output 0.0 for moods the prompt is silent on."""
+artist/genre/language mentions; otherwise leave them null.
+
+LANGUAGE RULES (critical):
+- preferred_language must be a 2-letter ISO 639-1 code: "es", "en", "pt", "fr",
+  "it", "de", "ja", "ko", etc. NEVER the full name ("Spanish", "English").
+- ONLY set preferred_language if the user EXPLICITLY asks for a language
+  ("canciones en español", "songs in English", "musique française"). Writing the
+  prompt itself in Spanish is NOT a request for Spanish-language songs — leave
+  preferred_language null in that case.
+
+Never invent data the user didn't imply: output 0.0 for moods the prompt is
+silent on."""
 
 
 class PromptParserService:

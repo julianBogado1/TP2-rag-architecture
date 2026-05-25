@@ -1,4 +1,9 @@
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, field_validator
+
+# Pinecone stores `language` as a lowercase ISO 639-1 2-letter code ("es", "en", ...).
+# This regex defines the format PromptScore.preferred_language is normalised to.
+ISO_639_1_PATTERN = re.compile(r"^[a-z]{2}$")
 
 
 class PromptAudioFeatures(BaseModel):
@@ -30,3 +35,19 @@ class PromptScore(BaseModel):
     extracted_artists: list[str] | None = None
     preferred_language: str | None = None
     audio_features: PromptAudioFeatures
+
+    @field_validator("preferred_language", mode="before")
+    @classmethod
+    def _normalize_language(cls, v):
+        """Coerce to lowercase ISO 639-1 2-letter code or None. Anything else (full
+        names like 'Spanish', empty strings, malformed input) becomes None so the
+        retrieval-time language filter is simply skipped instead of excluding
+        every song due to a format mismatch with what Pinecone stores."""
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            return None
+        v = v.strip().lower()
+        if ISO_639_1_PATTERN.match(v):
+            return v
+        return None

@@ -57,7 +57,7 @@ class RecommendationRequestBuilder:
             genres_in          = score.extracted_genres or None,
             genres_not_in      = profile.disliked_genres or None,
             artist_not_in      = profile.disliked_artists or None,
-            preferred_language = score.preferred_language or profile.preferred_language,
+            preferred_language = score.preferred_language or None,
             min_popularity     = MIN_POPULARITY_WHEN_POPULAR if score.wants_popular_songs > WANTS_POPULAR_THRESHOLD else None,
             release_date_min   = today - timedelta(days=RECENT_WINDOW_DAYS) if score.wants_recent_songs > WANTS_RECENT_THRESHOLD else None,
             release_date_max   = None,

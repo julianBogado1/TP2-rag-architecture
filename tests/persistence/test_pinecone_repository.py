@@ -41,3 +41,30 @@ def test_query_empty_matches():
     fake_index.query.return_value = {"matches": []}
 
     assert repo.query([0.1] * 384, top_k=10) == []
+
+
+class _ScoredVector:
+    """Minimal stand-in for pinecone-client v3+ ScoredVector (attribute access)."""
+    def __init__(self, id, score, metadata):
+        self.id = id
+        self.score = score
+        self.metadata = metadata
+
+
+class _QueryResponse:
+    def __init__(self, matches):
+        self.matches = matches
+
+
+def test_query_handles_pinecone_v3_object_response():
+    repo, fake_index = _repo_with_fake_index()
+    fake_index.query.return_value = _QueryResponse(matches=[
+        _ScoredVector("42_3", 0.81, {"song_id": 42}),
+        _ScoredVector("13_0", 0.55, None),
+    ])
+
+    result = repo.query([0.1] * 384, top_k=10)
+
+    assert [m.chunk_id for m in result] == ["42_3", "13_0"]
+    assert result[0].metadata == {"song_id": 42}
+    assert result[1].metadata == {}

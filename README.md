@@ -111,7 +111,7 @@ Songs without Spotify data will have empty `{}` for both chunk fields.
 ### Prerequisites
 
 1. MongoDB running with songs ingested (see Scripts above)
-2. `.env` contains `PINECONE_API_KEY` and `PINECONE_INDEX_NAME`
+2. `.env` contains `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, and `OPENAI_API_KEY`
 
 ### Run the pipeline
 
@@ -144,6 +144,9 @@ python3 -m venv .venv
 
 # 2. Copy and fill in environment variables
 cp .env.example .env
+#   Edit .env to set:
+#     PINECONE_API_KEY=pcsk_...
+#     OPENAI_API_KEY=sk-...
 
 # 3. Start MongoDB
 bash scripts/mongo-start.sh
@@ -151,11 +154,19 @@ bash scripts/mongo-start.sh
 # 4. Ingest songs (only needed once — data persists in Docker volume)
 .venv/bin/python scripts/ingest_songs_joined.py 5000
 
-# 5. Start the API
+# 5. Seed user profiles (required for /recommend)
+.venv/bin/python scripts/seed_users.py
+
+# 6. Start the API
 .venv/bin/uvicorn app.main:app --reload
 
-# 6. Run the indexing pipeline (separate terminal)
+# 7. Run the indexing pipeline (separate terminal)
 curl -X POST http://localhost:8000/index
+
+# 8. Make a recommendation
+curl -X POST http://localhost:8000/recommend \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id": "user_001", "raw_prompt": "quiero canciones felices :)"}'
 ```
 
 # Recommendation endpoint
@@ -180,14 +191,25 @@ Pipeline stages (see `docs/2026-05-24-rag-recommendation-pipeline-example.md` fo
 6. `CandidateAggregatorService` — groups chunks by song, fetches evidence lyrics from Mongo.
 7. `HybridRerankerService` — weighted-sum scoring (lyrics + audio + profile + popularity + recency).
 8. `TopNSelectorService` — sort, dedup by title, cap per artist.
-9. `ResponseGeneratorService` — OpenAI structured-output → `RecommendationResponse`.
+9. `ResponseGeneratorService` — OpenAI structured-output → `RecommendationResponse`. **Currently disabled** (`skip_llm=True` hardcoded in `app/main.py`): the response is synthesised locally from the top songs without calling OpenAI. Each `recommendation` gets `explanation=""`, plus `matched_mood` / `matched_audio_features` derived from `PromptScore` fields > 0.5. Flip to `skip_llm=False` to enable real LLM explanations.
 
-### Smoke test (hits real Mongo + Pinecone + OpenAI)
+### Skip flag — what calls OpenAI today
+
+| Stage                       | OpenAI call?                                 |
+|-----------------------------|----------------------------------------------|
+| `PromptParserService` (step 1) | Yes — always (parses raw prompt → `PromptScore`) |
+| `ResponseGeneratorService` (step 9) | No — synthesised locally while `skip_llm=True`  |
+
+To re-enable step 9, edit `app/main.py` and remove `skip_llm=True` from the `ResponseGeneratorService(...)` constructor in the lifespan.
+
+### Smoke test (hits real Mongo + Pinecone + OpenAI for step 1)
 
 ```bash
 .venv/bin/python scripts/smoke_recommend.py "happy upbeat songs"
 .venv/bin/python scripts/smoke_recommend.py "songs about heartbreak" user_007
 ```
+
+Prints the full `RecommendationResponse` JSON. Notice `explanation=""` while the response LLM is skipped.
 
 # Tests
 
