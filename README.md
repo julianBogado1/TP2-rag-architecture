@@ -216,3 +216,49 @@ Prints the full `RecommendationResponse` JSON. Notice `explanation=""` while the
 ```bash
 .venv/bin/python -m pytest tests/ -v
 ```
+
+# Evaluation
+
+Four metrics evaluate the pipeline end-to-end: **Context Precision@K** and **Recall@K** measure retrieval quality; **Faithfulness** and **Answer Relevance** measure generation quality. See [docs/metrics.md](docs/metrics.md) for formulas and examples.
+
+### Prerequisites
+
+- MongoDB running with songs ingested and Pinecone indexed (see Full Setup above)
+- `OPENAI_API_KEY` set in `.env`
+- LLM response enabled: remove `skip_llm=True` from `ResponseGeneratorService(...)` in `app/main.py`
+
+### Step 1 — Build ground truth
+
+Queries MongoDB audio features to label eligible songs per mood category and creates a neutral eval user with no preferences (to isolate retrieval quality from profile bias).
+
+```bash
+.venv/bin/python scripts/build_gt.py
+```
+
+Output: `data/gt_test_cases.json` — one entry per category with the list of `gt_song_ids`.
+
+### Step 2 — Run evaluation
+
+Runs the full recommendation pipeline for each test case and computes all four metrics.
+
+```bash
+.venv/bin/python scripts/run_evaluation.py
+```
+
+Output: printed metrics table + `data/evaluation_results.json`.
+
+Example output:
+
+```
+Label          CP@K  Rec@K  Faith AnsRel
+-----------------------------------------
+Happy         0.820  0.600  0.950  0.880
+Sad           0.740  0.550  0.900  0.850
+Energetic     0.860  0.700  0.980  0.910
+Calm          0.780  0.580  0.920  0.870
+Danceable     0.800  0.620  0.940  0.860
+Acoustic      0.720  0.530  0.910  0.840
+Instrumental  0.690  0.510  0.890  0.820
+-----------------------------------------
+AVERAGE       0.773  0.584  0.927  0.861
+```

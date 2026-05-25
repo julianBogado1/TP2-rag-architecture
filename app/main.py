@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
         reranker           = HybridRerankerService(),
         selector           = TopNSelectorService(settings.selector_max_per_artist),
         response_generator = ResponseGeneratorService(
-            llm_client, settings.openai_model_response, skip_llm=True,
+            llm_client, settings.openai_model_response,
         ),
     )
 
