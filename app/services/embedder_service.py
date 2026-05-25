@@ -43,3 +43,12 @@ class EmbedderService:
             total += len(batch)
             logger.info(f"Embedded and indexed {total} / {len(chunks)} chunks.")
         return total
+
+    def embed_query(self, text: str) -> list[float]:
+        """Embed a single text using the same model used at index time."""
+        # NOTE: uses HuggingFaceEmbeddings.embed_query, NOT .embed_documents. For
+        # all-MiniLM-L6-v2 both produce the same vector, but for asymmetric models
+        # (E5, BGE, etc. — they prepend "query: "/"passage: ") this would diverge
+        # from the index-time path and silently degrade retrieval quality. If the
+        # embedding model is swapped and recall drops, check this first.
+        return self._embeddings.embed_query(text)

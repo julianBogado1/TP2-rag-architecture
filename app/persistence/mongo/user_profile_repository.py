@@ -1,15 +1,14 @@
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.database import Database
+from pymongo.collection import Collection
 from app.models.user_profile import UserProfileData
 
 
 class UserProfileRepository:
-    def __init__(self, db: AsyncIOMotorDatabase) -> None:
-        self._db = db
+    COLLECTION = "user_profiles"
 
-    async def get_by_user_id(self, user_id: str) -> UserProfileData | None:
-        doc = await self._db["user_profiles"].find_one(
-            {"user_id": user_id}, {"_id": 0}
-        )
-        if doc is None:
-            return None
-        return UserProfileData(**doc)
+    def __init__(self, db: Database) -> None:
+        self._collection: Collection = db[self.COLLECTION]
+
+    def get_by_user_id(self, user_id: str) -> UserProfileData | None:
+        doc = self._collection.find_one({"user_id": user_id}, {"_id": 0})
+        return UserProfileData(**doc) if doc else None

@@ -1,0 +1,27 @@
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+from app.core.exceptions import UserNotFoundError, LLMProviderError, VectorStoreError
+from app.services.retrieval.recommendation_orchestrator import RecommendationOrchestrator
+from app.models.recommendation_response import RecommendationResponse
+
+
+class RecommendRequestBody(BaseModel):
+    user_id: str
+    raw_prompt: str = Field(min_length=1, max_length=2000)
+
+
+def build_recommendation_router(orchestrator: RecommendationOrchestrator) -> APIRouter:
+    router = APIRouter()
+
+    @router.post("/recommend", response_model=RecommendationResponse)
+    def recommend(body: RecommendRequestBody) -> RecommendationResponse:
+        try:
+            return orchestrator.recommend(body.user_id, body.raw_prompt)
+        except UserNotFoundError:
+            raise HTTPException(404, "User not found")
+        except LLMProviderError:
+            raise HTTPException(502, "Upstream model failure")
+        except VectorStoreError:
+            raise HTTPException(502, "Vector store failure")
+
+    return router

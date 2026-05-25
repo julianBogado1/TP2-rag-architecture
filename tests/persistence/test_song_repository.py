@@ -136,3 +136,25 @@ def test_get_by_year_returns_list():
     assert len(results) == 1
     assert results[0].year == 2007
     col.find.assert_called_once_with({"year": 2007}, {"_id": 0})
+
+
+def test_get_by_ids_returns_matching_songs():
+    repo, col = _repo()
+    col.find.return_value = [
+        _song(song_id=1).model_dump(),
+        _song(song_id=3).model_dump(),
+    ]
+
+    results = repo.get_by_ids([1, 3, 999])
+
+    assert sorted(s.song_id for s in results) == [1, 3]
+    col.find.assert_called_once_with({"song_id": {"$in": [1, 3, 999]}}, {"_id": 0})
+
+
+def test_get_by_ids_empty_list_returns_empty():
+    repo, col = _repo()
+
+    results = repo.get_by_ids([])
+
+    assert results == []
+    col.find.assert_not_called()

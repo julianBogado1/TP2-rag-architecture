@@ -43,3 +43,9 @@ class SongRepository:
     def get_by_year(self, year: int) -> list[SongDocument]:
         docs = self._collection.find({"year": year}, {"_id": 0})
         return [SongDocument(**doc) for doc in docs]
+
+    def get_by_ids(self, song_ids: list[int]) -> list[SongDocument]:
+        if not song_ids:
+            return []
+        docs = self._collection.find({"song_id": {"$in": song_ids}}, {"_id": 0})
+        return [SongDocument(**doc) for doc in docs]

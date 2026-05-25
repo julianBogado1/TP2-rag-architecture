@@ -157,3 +157,40 @@ bash scripts/mongo-start.sh
 # 6. Run the indexing pipeline (separate terminal)
 curl -X POST http://localhost:8000/index
 ```
+
+# Recommendation endpoint
+
+Once songs are indexed in Pinecone and a user profile exists in Mongo, the recommendation pipeline turns a natural-language prompt into 10 ranked songs.
+
+```bash
+curl -X POST http://localhost:8000/recommend \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id": "user_001", "raw_prompt": "quiero canciones que vayan con mi mood feliz :)"}'
+```
+
+Returns a `RecommendationResponse` with a `message` and up to 10 `recommendations`.
+
+Pipeline stages (see `docs/2026-05-24-rag-recommendation-pipeline-example.md` for a full step-by-step trace):
+
+1. `PromptParserService` — OpenAI structured-output → `PromptScore`.
+2. `UserProfileRepository.get_by_user_id` — fetches `UserProfileData` from Mongo.
+3. `RecommendationRequestBuilder` — derives filters and weight overrides.
+4. `QueryEmbedderService` — embeds the cleaned `semantic_query` with the same model used at index time.
+5. `VectorRetrievalService` — Pinecone search → JSON metadata parse → Python filtering.
+6. `CandidateAggregatorService` — groups chunks by song, fetches evidence lyrics from Mongo.
+7. `HybridRerankerService` — weighted-sum scoring (lyrics + audio + profile + popularity + recency).
+8. `TopNSelectorService` — sort, dedup by title, cap per artist.
+9. `ResponseGeneratorService` — OpenAI structured-output → `RecommendationResponse`.
+
+### Smoke test (hits real Mongo + Pinecone + OpenAI)
+
+```bash
+.venv/bin/python scripts/smoke_recommend.py "happy upbeat songs"
+.venv/bin/python scripts/smoke_recommend.py "songs about heartbreak" user_007
+```
+
+# Tests
+
+```bash
+.venv/bin/python -m pytest tests/ -v
+```
