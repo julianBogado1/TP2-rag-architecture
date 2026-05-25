@@ -3,6 +3,7 @@ from uuid import uuid4
 from app.core.exceptions import UserNotFoundError
 from app.models.request_context import RequestContext
 from app.models.recommendation_response import RecommendationResponse
+from app.persistence.mongo.user_profile_repository import UserProfileRepository
 from app.services.retrieval.prompt_parser_service import PromptParserService
 from app.services.retrieval.recommendation_request_builder import RecommendationRequestBuilder
 from app.services.retrieval.query_embedder_service import QueryEmbedderService
@@ -21,7 +22,7 @@ class RecommendationOrchestrator:
     def __init__(
         self,
         prompt_parser:      PromptParserService,
-        user_repo,
+        user_repo:          UserProfileRepository,
         request_builder:    RecommendationRequestBuilder,
         query_embedder:     QueryEmbedderService,
         vector_retrieval:   VectorRetrievalService,
@@ -42,16 +43,19 @@ class RecommendationOrchestrator:
 
     def recommend(self, user_id: str, raw_prompt: str) -> RecommendationResponse:
         ctx = RequestContext(
-            user_id=user_id, raw_prompt=raw_prompt,
-            timestamp=datetime.now(timezone.utc), session_id=str(uuid4()),
+            user_id=user_id, 
+            raw_prompt=raw_prompt,
+            timestamp=datetime.now(timezone.utc), 
+            session_id=str(uuid4()),
         )
-        score   = self._prompt_parser.parse(raw_prompt)
+        score = self._prompt_parser.parse(raw_prompt)
         profile = self._user_repo.get_by_user_id(user_id)
+
         if profile is None:
             raise UserNotFoundError(user_id)
 
-        req    = self._request_builder.build(ctx, score, profile)
-        qvec   = self._query_embedder.embed(req.semantic_query)
+        req = self._request_builder.build(ctx, score, profile)
+        qvec = self._query_embedder.embed(req.semantic_query)
         chunks = self._vector_retrieval.retrieve(req, qvec)
         if not chunks:
             return RecommendationResponse(message=EMPTY_RESULT_MESSAGE, recommendations=[])
@@ -60,3 +64,4 @@ class RecommendationOrchestrator:
         ranked = self._reranker.rerank(cands, req)
         top    = self._selector.select(ranked, req.top_n_output)
         return self._response_generator.generate(top, req)
+

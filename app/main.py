@@ -50,7 +50,9 @@ async def lifespan(app: FastAPI):
         aggregator         = CandidateAggregatorService(song_repo, settings.aggregator_max_evidence_chunks),
         reranker           = HybridRerankerService(),
         selector           = TopNSelectorService(settings.selector_max_per_artist),
-        response_generator = ResponseGeneratorService(llm_client, settings.openai_model_response),
+        response_generator = ResponseGeneratorService(
+            llm_client, settings.openai_model_response, skip_llm=True,
+        ),
     )
 
     app.include_router(indexing_router)
