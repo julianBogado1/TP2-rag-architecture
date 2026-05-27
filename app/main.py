@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from pymongo import MongoClient
+from fastapi.staticfiles import StaticFiles
+import webbrowser
+import threading
 
 from app.core.config import settings
 from app.core.llm_client import OpenAILLMClient
@@ -19,7 +22,7 @@ from app.services.retrieval.response_generator_service import ResponseGeneratorS
 from app.services.retrieval.recommendation_orchestrator import RecommendationOrchestrator
 from app.controllers.recommendation_controller import build_recommendation_router
 from app.controllers.indexing_controller import router as indexing_router
-
+from app.controllers.user_profile_controller import build_user_profile_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -57,7 +60,9 @@ async def lifespan(app: FastAPI):
 
     app.include_router(indexing_router)
     app.include_router(build_recommendation_router(orchestrator))
-
+    app.include_router(build_user_profile_router(user_repo))
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
+    print("Frontend disponible en http://localhost:8000")
     yield
     mongo.close()
 

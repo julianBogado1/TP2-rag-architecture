@@ -12,3 +12,10 @@ class UserProfileRepository:
     def get_by_user_id(self, user_id: str) -> UserProfileData | None:
         doc = self._collection.find_one({"user_id": user_id}, {"_id": 0})
         return UserProfileData(**doc) if doc else None
+
+    def upsert(self, profile: UserProfileData) -> None:
+        self._collection.update_one(
+            {"user_id": profile.user_id},
+            {"$set": profile.model_dump()},
+            upsert=True,
+        )

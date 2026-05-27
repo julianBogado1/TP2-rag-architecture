@@ -4,6 +4,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 from app.models.song_document import SongDocument
 from app.persistence.mongo.song_repository import SongRepository
+from app.services.song_matcher import SongMatcher
 
 
 @dataclass(frozen=True)
@@ -21,12 +22,8 @@ class SongIngestService:
         if batch_size < 1:
             raise ValueError(f"batch_size must be >= 1, got {batch_size}")
 
-        spotify_lookup: dict[tuple[str, str], dict] = {}
-        for row in load_dataset("maharshipandya/spotify-tracks-dataset", split="train", streaming=True):
-            if row["track_name"] is None or row["artists"] is None:
-                continue
-            key = (row["track_name"].lower(), row["artists"].lower())
-            spotify_lookup[key] = row
+        matcher = SongMatcher()
+        matcher.build_index(load_dataset("maharshipandya/spotify-tracks-dataset", split="train", streaming=True))
 
         self._repository.drop_collection()
 
@@ -43,8 +40,7 @@ class SongIngestService:
                 break
 
             try:
-                key = (row["title"].lower(), row["artist"].lower())
-                sp = spotify_lookup.get(key)
+                sp = matcher.lookup(row)
                 if sp:
                     spotify_matches += 1
                     progress.set_postfix(matches=spotify_matches, inserted=total_inserted)

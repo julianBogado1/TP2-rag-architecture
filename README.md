@@ -41,7 +41,7 @@ bash scripts/mongo-start.sh
 
 ### Ingest songs dataset
 
-Streams the full Spotify tracks dataset into memory, then streams Genius song lyrics up to `<max_songs>`, joining both by title and artist. Results are stored in the `songs` collection with Spotify audio features populated where a match exists and `null` otherwise.
+Streams the full Spotify tracks dataset into memory, then streams Genius song lyrics up to `<max_songs>`, joining both on a normalized title + artist key (accent/case-folded, `feat.`/cosmetic suffixes stripped, multi-artist any-match; see `app/services/song_matcher.py`). Results are stored in the `songs` collection with Spotify audio features populated where a match exists and `null` otherwise.
 
 ```bash
 .venv/bin/python scripts/ingest_songs_joined.py <max_songs>
