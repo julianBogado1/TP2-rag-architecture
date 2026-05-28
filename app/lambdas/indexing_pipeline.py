@@ -27,15 +27,22 @@ class IndexingPipeline:
         self._splitter = splitter
         self._embedder = embedder
 
-    def run(self) -> IndexingResult:
+    def run(self, song_ids: list[int] | None = None) -> IndexingResult:
         logger.info("Indexing pipeline started.")
-        docs = self._loader.load()
-        chunks = self._splitter.split(docs)
+        doc_count = 0
+
+        def counted_docs():
+            nonlocal doc_count
+            for doc in self._loader.load(song_ids):
+                doc_count += 1
+                yield doc
+
+        chunks = self._splitter.split(counted_docs())
         total_indexed = self._embedder.embed_and_index(chunks)
-        logger.info(f"Pipeline complete. Indexed {total_indexed} chunks.")
+        logger.info(f"Pipeline complete. {doc_count} docs → {total_indexed} chunks indexed.")
         return IndexingResult(
-            total_docs=len(docs),
-            total_chunks=len(chunks),
+            total_docs=doc_count,
+            total_chunks=total_indexed,
             total_indexed=total_indexed,
         )
 

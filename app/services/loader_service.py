@@ -12,10 +12,10 @@ class LoaderService:
     def __init__(self, repo: SongRepository) -> None:
         self._repo = repo
 
-    def load(self) -> list[Document]:
-        songs = self._repo.get_all()
-        docs = [
-            Document(
+    def load(self, song_ids: list[int] | None = None):
+        source = self._repo.get_by_ids_stream(song_ids) if song_ids is not None else self._repo.get_all()
+        for song in source:
+            yield Document(
                 page_content=song.lyrics,
                 metadata={
                     "song_id": song.song_id,
@@ -27,10 +27,6 @@ class LoaderService:
                     "audio_features_chunk": json.dumps(self._build_audio_features(song)),
                 },
             )
-            for song in songs
-        ]
-        logger.info(f"Loaded {len(docs)} documents from MongoDB.")
-        return docs
     
     @staticmethod
     def _build_song_characteristics(song) -> dict:

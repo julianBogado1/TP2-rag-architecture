@@ -1,4 +1,6 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from itertools import islice
 
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -25,23 +27,29 @@ class EmbedderService:
             model_kwargs={"device": device},
         )
 
-    def embed_and_index(self, chunks: list[Document]) -> int:
+    def embed_and_index(self, chunks) -> int:
         total = 0
-        for i in range(0, len(chunks), self._batch_size):
-            batch = chunks[i : i + self._batch_size]
-            texts = [chunk.page_content for chunk in batch]
-            vectors = self._embeddings.embed_documents(texts)
-            records = [
-                (
-                    f"{batch[j].metadata['song_id']}_{batch[j].metadata.get('start_index', j)}",
-                    vectors[j],
-                    batch[j].metadata,
-                )
-                for j in range(len(batch))
-            ]
-            self._vector_repo.upsert_batch(records)
-            total += len(batch)
-            logger.info(f"Embedded and indexed {total} / {len(chunks)} chunks.")
+        chunk_iter = iter(chunks)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            pending = None
+            while batch := list(islice(chunk_iter, self._batch_size)):
+                texts = [chunk.page_content for chunk in batch]
+                vectors = self._embeddings.embed_documents(texts)
+                records = [
+                    (
+                        f"{batch[j].metadata['song_id']}_{batch[j].metadata.get('start_index', j)}",
+                        vectors[j],
+                        batch[j].metadata,
+                    )
+                    for j in range(len(batch))
+                ]
+                if pending is not None:
+                    pending.result()
+                pending = pool.submit(self._vector_repo.upsert_batch, records)
+                total += len(batch)
+                logger.info(f"Indexed {total} chunks so far.")
+            if pending is not None:
+                pending.result()
         return total
 
     def embed_query(self, text: str) -> list[float]:

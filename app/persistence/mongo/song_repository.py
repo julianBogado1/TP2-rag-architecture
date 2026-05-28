@@ -22,9 +22,9 @@ class SongRepository:
     def count(self) -> int:
         return self._collection.count_documents({})
 
-    def get_all(self) -> list[SongDocument]:
-        docs = self._collection.find({}, {"_id": 0})
-        return [SongDocument(**doc) for doc in docs]
+    def get_all(self):
+        for doc in self._collection.find({}, {"_id": 0}):
+            yield SongDocument(**doc)
 
     def get_by_id(self, song_id: int) -> SongDocument | None:
         doc = self._collection.find_one({"song_id": song_id}, {"_id": 0})
@@ -49,3 +49,11 @@ class SongRepository:
             return []
         docs = self._collection.find({"song_id": {"$in": song_ids}}, {"_id": 0})
         return [SongDocument(**doc) for doc in docs]
+
+    def get_by_ids_stream(self, song_ids: list[int]):
+        cursor = self._collection.find(
+            {"song_id": {"$in": song_ids}},
+            {"_id": 0},
+        )
+        for doc in cursor:
+            yield SongDocument(**doc)

@@ -14,7 +14,6 @@ class SplitterService:
             add_start_index=True,
         )
 
-    def split(self, docs: list[Document]) -> list[Document]:
-        chunks = self._splitter.split_documents(docs)
-        logger.info(f"Split {len(docs)} documents into {len(chunks)} chunks.")
-        return chunks
+    def split(self, docs):
+        for doc in docs:
+            yield from self._splitter.split_documents([doc])

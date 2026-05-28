@@ -24,7 +24,8 @@ def _build_pipeline() -> tuple[IndexingPipeline, MongoClient]:
                 api_key=settings.pinecone_api_key,
                 index_name=settings.pinecone_index_name,
             ),
-            batch_size=500,
+            device=settings.embedding_device,
+            batch_size=settings.embedding_batch_size,
         ),
     )
     return pipeline, client

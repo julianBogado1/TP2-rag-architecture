@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     # Embedding
     embedding_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     embedding_device: str = "cpu"
+    embedding_batch_size: int = 512
 
     # Splitter
     splitter_chunk_size: int = 1000
