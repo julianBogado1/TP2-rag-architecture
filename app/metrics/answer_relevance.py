@@ -46,6 +46,8 @@ def answer_relevance_score(
         f"{r.track_name} by {r.artist_name}" for r in response.recommendations
     )
     result = llm.parse_structured(_MODEL, _SYSTEM, summary, _ReverseQuestions)
+    if result is None or not result.questions:
+        return 0.0
 
     prompt_vec = embedder.embed_query(raw_prompt)
     scores = [

@@ -8,6 +8,7 @@ Outputs: scripts/sample_200k_ids.json
 """
 import sys
 import json
+import random
 import argparse
 from pathlib import Path
 from math import ceil
@@ -45,18 +46,37 @@ def sample_balanced(col, n: int) -> list[int]:
     per_genre = ceil(n / len(genres))
     print(f"  {len(genres)} genres — {per_genre} songs/genre target")
 
-    ids: list[int] = []
+    ids_by_genre: dict[str, list[int]] = {}
     for genre in genres:
         pipeline = [
             {"$match": {"tag": genre, "lyrics": {"$nin": [None, ""]}}},
             {"$sample": {"size": per_genre}},
             {"$project": {"_id": 0, "song_id": 1}},
         ]
-        batch = [doc["song_id"] for doc in col.aggregate(pipeline)]
-        ids.extend(batch)
+        ids_by_genre[genre] = [doc["song_id"] for doc in col.aggregate(pipeline)]
 
-    # trim to exactly n if over
-    return ids[:n]
+    return balance(ids_by_genre, n)
+
+
+def balance(ids_by_genre: dict[str, list[int]], n: int) -> list[int]:
+    """Round-robin one id per genre until reaching n, so the final trim isn't
+    biased toward genres that happen to come first in aggregation order."""
+    pools = []
+    for ids in ids_by_genre.values():
+        shuffled = list(ids)
+        random.shuffle(shuffled)
+        pools.append(shuffled)
+
+    out: list[int] = []
+    idx = 0
+    while len(out) < n and any(idx < len(p) for p in pools):
+        for p in pools:
+            if idx < len(p):
+                out.append(p[idx])
+                if len(out) >= n:
+                    break
+        idx += 1
+    return out
 
 
 def main():

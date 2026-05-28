@@ -1,5 +1,12 @@
 # tp2-rag-arquitecture
-In this project we set to implement an LLM with RAG arquitecture
+In this project we set to implement an LLM with RAG arquitecture.
+
+A natural-language prompt → ranked song recommendations, using song **lyrics** as
+the semantic corpus (Pinecone, MiniLM 384-dim) and Spotify **audio features** as a
+second ranking signal. FastAPI + MongoDB + Pinecone + OpenAI `gpt-4o-mini`.
+
+> **Full architecture, diagrams and workflows:** see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> Worked metric examples: [`docs/metrics.md`](docs/metrics.md).
 
 # Setup
 
@@ -55,8 +62,10 @@ Example — ingest the first 5 000 songs:
 
 ### Drop songs collection (to re-ingest)
 
+Destructive — requires confirmation. Pass `--yes` to skip the prompt:
+
 ```bash
-.venv/bin/python scripts/clear_mongo.py
+.venv/bin/python scripts/clear_mongo.py --yes
 ```
 
 ### Inspect MongoDB container
@@ -101,12 +110,17 @@ Each vector is stored with this metadata shape:
   "artist_name": "JAY-Z",
   "genres": ["rap"],
   "release_date": "1998",
-  "song_characteristics_chunk": "{\"popularity\": 72, \"duration_ms\": 280000, \"explicit\": true, \"tempo\": 84.115, \"time_signature\": 4, \"language\": \"en\"}",
-  "audio_features_chunk": "{\"danceability\": 0.773, \"energy\": 0.54, \"key\": 6, \"loudness\": -7.123, \"mode\": 1, \"speechiness\": 0.103, \"acousticness\": 0.371, \"instrumentalness\": 0, \"liveness\": 0.131, \"valence\": 0.322}"
+  "song_characteristics_chunk": "{\"popularity\": 72, \"duration_ms\": 280000, \"explicit\": true, \"time_signature\": 4, \"language\": \"en\"}",
+  "audio_features_chunk": "{\"danceability\": 0.773, \"energy\": 0.54, \"key\": 6, \"loudness\": -7.123, \"mode\": 1, \"speechiness\": 0.103, \"acousticness\": 0.371, \"instrumentalness\": 0, \"liveness\": 0.131, \"valence\": 0.322, \"tempo\": 84.115}"
 }
 ```
 
-Songs without Spotify data will have empty `{}` for both chunk fields.
+`tempo` lives in `audio_features_chunk` (the retrieval reader looks for it there).
+Songs without a Spotify match have empty `{}` for both chunk fields — they are still
+indexed and remain retrievable, scored on lyrics alone at recommendation time.
+
+Lyrics are split into **400-char chunks (50 overlap)** — verse-sized, and inside the
+embedding model's 256-token limit so chunk tails aren't silently truncated.
 
 ### Prerequisites
 
@@ -191,16 +205,16 @@ Pipeline stages (see `docs/2026-05-24-rag-recommendation-pipeline-example.md` fo
 6. `CandidateAggregatorService` — groups chunks by song, fetches evidence lyrics from Mongo.
 7. `HybridRerankerService` — weighted-sum scoring (lyrics + audio + profile + popularity + recency).
 8. `TopNSelectorService` — sort, dedup by title, cap per artist.
-9. `ResponseGeneratorService` — OpenAI structured-output → `RecommendationResponse`. **Currently disabled** (`skip_llm=True` hardcoded in `app/main.py`): the response is synthesised locally from the top songs without calling OpenAI. Each `recommendation` gets `explanation=""`, plus `matched_mood` / `matched_audio_features` derived from `PromptScore` fields > 0.5. Flip to `skip_llm=False` to enable real LLM explanations.
+9. `ResponseGeneratorService` — OpenAI structured-output → `RecommendationResponse`. **Enabled by default** (`app/main.py` constructs it with `skip_llm=False`): OpenAI writes a short opener plus a per-song explanation citing evidence lyrics and matched moods. Construct the service with `skip_llm=True` to synthesise the response locally (no OpenAI call) — each `recommendation` then gets `explanation=""` and `matched_mood`/`matched_audio_features` derived from `PromptScore` fields > 0.5.
 
 ### Skip flag — what calls OpenAI today
 
 | Stage                       | OpenAI call?                                 |
 |-----------------------------|----------------------------------------------|
 | `PromptParserService` (step 1) | Yes — always (parses raw prompt → `PromptScore`) |
-| `ResponseGeneratorService` (step 9) | No — synthesised locally while `skip_llm=True`  |
+| `ResponseGeneratorService` (step 9) | Yes — enabled by default (`skip_llm=False`)  |
 
-To re-enable step 9, edit `app/main.py` and remove `skip_llm=True` from the `ResponseGeneratorService(...)` constructor in the lifespan.
+To run without the response LLM (local synthesis, no OpenAI call for step 9), construct `ResponseGeneratorService(..., skip_llm=True)` in `app/main.py`.
 
 ### Smoke test (hits real Mongo + Pinecone + OpenAI for step 1)
 
@@ -209,7 +223,7 @@ To re-enable step 9, edit `app/main.py` and remove `skip_llm=True` from the `Res
 .venv/bin/python scripts/smoke_recommend.py "songs about heartbreak" user_007
 ```
 
-Prints the full `RecommendationResponse` JSON. Notice `explanation=""` while the response LLM is skipped.
+Prints the full `RecommendationResponse` JSON, including per-song `explanation` text from the response LLM (empty only if you run with `skip_llm=True`).
 
 # Tests
 
@@ -225,7 +239,7 @@ Four metrics evaluate the pipeline end-to-end: **Context Precision@K** and **Rec
 
 - MongoDB running with songs ingested and Pinecone indexed (see Full Setup above)
 - `OPENAI_API_KEY` set in `.env`
-- LLM response enabled: remove `skip_llm=True` from `ResponseGeneratorService(...)` in `app/main.py`
+- Response LLM is enabled by default (`skip_llm=False`), so faithfulness/answer-relevance reflect real generations
 
 ### Step 1 — Build ground truth
 
@@ -247,7 +261,7 @@ Runs the full recommendation pipeline for each test case and computes all four m
 
 Output: printed metrics table + `data/evaluation_results.json`.
 
-Example output:
+Example output (illustrative numbers, not a measured run):
 
 ```
 Label          CP@K  Rec@K  Faith AnsRel

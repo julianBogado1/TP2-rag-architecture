@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from pymongo.database import Database
 from datasets import load_dataset
@@ -6,31 +7,37 @@ from app.models.song_document import SongDocument
 from app.persistence.mongo.song_repository import SongRepository
 from app.services.song_matcher import SongMatcher
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class SongIngestResult:
     total_inserted: int
     batches: int
     spotify_matches: int
+    failures: int = 0
 
 
 class SongIngestService:
     def __init__(self, db: Database) -> None:
         self._repository = SongRepository(db)
 
-    def run(self, max_songs: int, batch_size: int = 500) -> SongIngestResult:
+    def run(self, max_songs: int, batch_size: int = 500, *, reset: bool = False) -> SongIngestResult:
         if batch_size < 1:
             raise ValueError(f"batch_size must be >= 1, got {batch_size}")
 
         matcher = SongMatcher()
         matcher.build_index(load_dataset("maharshipandya/spotify-tracks-dataset", split="train", streaming=True))
 
-        self._repository.drop_collection()
+        if reset:
+            self._repository.drop_collection()
+        self._repository.ensure_indexes()
 
         batch: list[SongDocument] = []
         total_inserted = 0
         batches = 0
         spotify_matches = 0
+        failures = 0
 
         genius = load_dataset("sebastiandizon/genius-song-lyrics", split="train", streaming=True)
         progress = tqdm(genius, total=max_songs, desc="Ingesting songs", unit="song")
@@ -77,7 +84,8 @@ class SongIngestService:
                     track_genre=sp["track_genre"] if sp else None,
                 ))
             except Exception as e:
-                print(f"Skipping row {i}: {e}")
+                failures += 1
+                logger.warning("Skipping row %d: %s", i, e)
                 continue
 
             if len(batch) >= batch_size:
@@ -86,7 +94,8 @@ class SongIngestService:
                     total_inserted += self._repository.insert_many(batch)
                     progress.set_postfix(matches=spotify_matches, inserted=total_inserted)
                 except Exception as e:
-                    tqdm.write(f"Error in batch {batches}: {e}")
+                    failures += len(batch)
+                    logger.error("Error inserting batch %d: %s", batches, e)
                 batch = []
 
         if batch:
@@ -95,6 +104,12 @@ class SongIngestService:
                 total_inserted += self._repository.insert_many(batch)
                 progress.set_postfix(matches=spotify_matches, inserted=total_inserted)
             except Exception as e:
-                tqdm.write(f"Error in batch {batches}: {e}")
+                failures += len(batch)
+                logger.error("Error inserting batch %d: %s", batches, e)
 
-        return SongIngestResult(total_inserted=total_inserted, batches=batches, spotify_matches=spotify_matches)
+        return SongIngestResult(
+            total_inserted=total_inserted,
+            batches=batches,
+            spotify_matches=spotify_matches,
+            failures=failures,
+        )

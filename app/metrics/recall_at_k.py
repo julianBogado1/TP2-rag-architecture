@@ -14,7 +14,7 @@ def recall_at_k(
     The denominator is capped at K because in a recommendation system the GT
     set can contain thousands of songs — raw Context Recall would always be ~0.
     """
-    if not gt_song_ids:
+    if not gt_song_ids or k <= 0:
         return 0.0
     top_ids = {s.song_id for s in ranked_songs[:k]}
     relevant_retrieved = len(top_ids & gt_song_ids)

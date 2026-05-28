@@ -104,3 +104,20 @@ def test_collision_keeps_highest_popularity():
     high["track_id"] = "high"
     matcher.build_index([low, high])
     assert matcher.lookup({"title": "Song", "artist": "Artist"})["track_id"] == "high"
+
+
+def test_lookup_none_title_or_artist_returns_none():
+    matcher = SongMatcher()
+    matcher.build_index([_spotify_row("My Song", "My Artist")])
+    assert matcher.lookup({"title": None, "artist": "my artist"}) is None
+    assert matcher.lookup({"title": "my song", "artist": None}) is None
+
+
+def test_build_index_stores_only_slim_fields():
+    matcher = SongMatcher()
+    row = _spotify_row("My Song", "My Artist")
+    row["unused_raw_field"] = "should not be stored"
+    matcher.build_index([row])
+    stored = matcher.lookup({"title": "my song", "artist": "my artist"})
+    assert "unused_raw_field" not in stored
+    assert stored["track_id"] == "sp1"

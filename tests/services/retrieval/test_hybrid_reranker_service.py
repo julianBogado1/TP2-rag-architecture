@@ -85,3 +85,32 @@ def test_negative_popularity_weight_demotes_popular():
     popular = svc.rerank([_candidate(popularity=90)], _request(weights=weights))[0]
     obscure = svc.rerank([_candidate(popularity=10)], _request(weights=weights))[0]
     assert popular.score_total < obscure.score_total
+
+
+def _no_audio_candidate(song_id="1", lyrics_sim=0.8, popularity=80, year=2024, artist="X"):
+    return CandidateSong(
+        song_id=song_id, track_name=f"t{song_id}", artist_name=artist,
+        genres=["pop"], popularity=popularity, release_date=date(year, 1, 1),
+        best_lyrics_chunks=["..."], best_lyrics_similarity=lyrics_sim,
+        audio_features=None,
+    )
+
+
+def test_no_audio_song_scores_zero_on_audio_axis():
+    svc = HybridRerankerService()
+    r = svc.rerank([_no_audio_candidate()], _request())[0]
+    assert r.score_breakdown.score_audio == 0.0
+    total = (r.score_breakdown.score_lyrics + r.score_breakdown.score_audio
+             + r.score_breakdown.score_profile + r.score_breakdown.score_popularity
+             + r.score_breakdown.score_recency)
+    assert isclose(total, r.score_total, abs_tol=1e-6)
+
+
+def test_no_audio_renormalizes_remaining_weights():
+    svc = HybridRerankerService()
+    weights = RankingWeights(w_lyrics=0.55, w_audio=0.30, w_profile=0.10,
+                              w_popularity=0.03, w_recency=0.02)
+    r = svc.rerank([_no_audio_candidate(lyrics_sim=0.8)], _request(weights=weights))[0]
+    # lyrics contribution is scaled up by 1/(1 - w_audio) so the song isn't
+    # penalized for missing audio (would be 0.55*0.8 = 0.44 without renormalization).
+    assert r.score_breakdown.score_lyrics > 0.55 * 0.8

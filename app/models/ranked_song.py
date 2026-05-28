@@ -11,6 +11,7 @@ class ScoreBreakdown(BaseModel):
 
 
 class RankedSongCandidate(BaseModel):
+    """A candidate after reranking (all candidates, scored)."""
     song_id: str
     track_name: str
     artist_name: str
@@ -21,6 +22,7 @@ class RankedSongCandidate(BaseModel):
 
 
 class TopRecommendedSong(BaseModel):
+    """A candidate that survived top-N selection (dedup + per-artist cap)."""
     song_id: str
     track_name: str
     artist_name: str

@@ -138,13 +138,44 @@ def test_run_flushes_remainder_batch():
     assert result.total_inserted == 3
 
 
-def test_run_drops_collection_before_inserting():
+def test_run_with_reset_drops_collection():
+    db = _mock_db(0)
+
+    with patch("app.services.song_ingest_service.load_dataset", side_effect=[iter([]), iter([])]):
+        SongIngestService(db).run(max_songs=5, reset=True)
+
+    db["songs"].drop.assert_called_once()
+
+
+def test_run_without_reset_does_not_drop():
     db = _mock_db(0)
 
     with patch("app.services.song_ingest_service.load_dataset", side_effect=[iter([]), iter([])]):
         SongIngestService(db).run(max_songs=5)
 
-    db["songs"].drop.assert_called_once()
+    db["songs"].drop.assert_not_called()
+
+
+def test_run_always_ensures_indexes():
+    db = _mock_db(0)
+
+    with patch("app.services.song_ingest_service.load_dataset", side_effect=[iter([]), iter([])]):
+        SongIngestService(db).run(max_songs=5)
+
+    db["songs"].create_index.assert_called_once_with("song_id", unique=True)
+
+
+def test_run_nan_spotify_field_stored_as_none():
+    db = _mock_db(1)
+    sp = _spotify_row("my song", "my artist")
+    sp["tempo"] = float("nan")
+    genius = [_genius_row(1, title="My Song", artist="My Artist")]
+
+    with patch("app.services.song_ingest_service.load_dataset", side_effect=[iter([sp]), iter(genius)]):
+        SongIngestService(db).run(max_songs=1, batch_size=10)
+
+    doc = db["songs"].insert_many.call_args[0][0][0]
+    assert doc["tempo"] is None
 
 
 def test_run_empty_genius_stream_returns_zero():

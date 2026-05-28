@@ -82,4 +82,14 @@ class RecommendationRequestBuilder:
             weights.w_audio  = MOOD_FOCUS_W_AUDIO
         if score.wants_obscure_songs > WANTS_OBSCURE_THRESHOLD:
             weights.w_popularity = OBSCURE_W_POPULARITY
+        # Presets shift individual weights off the 1.0 sum; renormalize so score_total
+        # stays comparable across requests (guard the degenerate near-zero sum).
+        total = (weights.w_lyrics + weights.w_audio + weights.w_profile
+                 + weights.w_popularity + weights.w_recency)
+        if abs(total - 1.0) > 1e-9:
+            weights.w_lyrics /= total
+            weights.w_audio /= total
+            weights.w_profile /= total
+            weights.w_popularity /= total
+            weights.w_recency /= total
         return weights

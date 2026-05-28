@@ -7,14 +7,20 @@ data/gt_test_cases.json. Also upserts the neutral eval user.
 Usage:
     python scripts/build_gt.py
 """
+import sys
 import json
 from pathlib import Path
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
 load_dotenv()
 
 from app.core.config import settings
+from app.models.user_profile import UserProfileData
+from app.persistence.mongo.user_profile_repository import UserProfileRepository
 
 TEST_CASES_TEMPLATE = [
     {
@@ -82,47 +88,44 @@ EVAL_USER = {
 
 def main() -> None:
     mongo = MongoClient(settings.mongo_uri)
-    db = mongo[settings.mongo_db_name]
-    songs_col = db["songs"]
-    users_col = db["users"]
+    try:
+        db = mongo[settings.mongo_db_name]
+        songs_col = db["songs"]
+        user_repo = UserProfileRepository(db)
 
-    users_col.update_one(
-        {"user_id": EVAL_USER["user_id"]},
-        {"$set": EVAL_USER},
-        upsert=True,
-    )
-    print(f"Upserted eval user: {EVAL_USER['user_id']}")
+        user_repo.upsert(UserProfileData(**EVAL_USER))
+        print(f"Upserted eval user: {EVAL_USER['user_id']}")
 
-    output = []
-    for tmpl in TEST_CASES_TEMPLATE:
-        feature = tmpl["target_feature"]
-        op = "$gt" if tmpl["operator"] == "gt" else "$lt"
-        threshold = tmpl["threshold"]
+        output = []
+        for tmpl in TEST_CASES_TEMPLATE:
+            feature = tmpl["target_feature"]
+            op = "$gt" if tmpl["operator"] == "gt" else "$lt"
+            threshold = tmpl["threshold"]
 
-        query = {feature: {op: threshold, "$ne": None}}
-        song_ids = [
-            str(doc["song_id"])
-            for doc in songs_col.find(query, {"song_id": 1, "_id": 0})
-        ]
+            query = {feature: {op: threshold, "$ne": None}}
+            song_ids = [
+                str(doc["song_id"])
+                for doc in songs_col.find(query, {"song_id": 1, "_id": 0})
+            ]
 
-        entry = {
-            "label": tmpl["label"],
-            "prompt": tmpl["prompt"],
-            "user_id": EVAL_USER["user_id"],
-            "target_feature": feature,
-            "operator": tmpl["operator"],
-            "threshold": threshold,
-            "gt_song_ids": song_ids,
-        }
-        output.append(entry)
-        print(f"  {tmpl['label']:14s} ({feature} {tmpl['operator']} {threshold}): {len(song_ids)} songs")
+            entry = {
+                "label": tmpl["label"],
+                "prompt": tmpl["prompt"],
+                "user_id": EVAL_USER["user_id"],
+                "target_feature": feature,
+                "operator": tmpl["operator"],
+                "threshold": threshold,
+                "gt_song_ids": song_ids,
+            }
+            output.append(entry)
+            print(f"  {tmpl['label']:14s} ({feature} {tmpl['operator']} {threshold}): {len(song_ids)} songs")
 
-    out_path = Path(__file__).parent.parent / "data" / "gt_test_cases.json"
-    out_path.parent.mkdir(exist_ok=True)
-    out_path.write_text(json.dumps(output, indent=2))
-    print(f"\nWritten to {out_path}")
-
-    mongo.close()
+        out_path = Path(__file__).parent.parent / "data" / "gt_test_cases.json"
+        out_path.parent.mkdir(exist_ok=True)
+        out_path.write_text(json.dumps(output, indent=2))
+        print(f"\nWritten to {out_path}")
+    finally:
+        mongo.close()
 
 
 if __name__ == "__main__":

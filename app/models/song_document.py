@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+import math
+
+from pydantic import BaseModel, field_validator
 
 
 class SongDocument(BaseModel):
@@ -7,8 +9,8 @@ class SongDocument(BaseModel):
     title: str
     tag: str
     artist: str
-    year: int
-    views: int
+    year: int | None = None
+    views: int | None = None
     features: str | None = None
     lyrics: str
     language_cld3: str | None = None
@@ -33,3 +35,16 @@ class SongDocument(BaseModel):
     tempo: float | None = None
     time_signature: int | None = None
     track_genre: str | None = None
+
+    @field_validator(
+        "danceability", "energy", "loudness", "speechiness", "acousticness",
+        "instrumentalness", "liveness", "valence", "tempo",
+        mode="before",
+    )
+    @classmethod
+    def _nan_to_none(cls, v):
+        # Spotify source rows can carry NaN floats; persist them as None so they
+        # don't leak NaN into Mongo or the JSON-serialized Pinecone metadata.
+        if isinstance(v, float) and math.isnan(v):
+            return None
+        return v

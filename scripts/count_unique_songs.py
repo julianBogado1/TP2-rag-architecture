@@ -14,6 +14,7 @@ total_vectors = 0
 
 for ids_batch in index.list(limit=100):
     for item in ids_batch:
+        # Vector ids are f"{song_id}_{start_index}" (see embedder_service.py); strip the suffix.
         song_id = item.id.rsplit("_", 1)[0]
         unique_songs.add(song_id)
     total_vectors += len(ids_batch)

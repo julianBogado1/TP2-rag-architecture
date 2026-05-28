@@ -24,8 +24,10 @@ class Settings(BaseSettings):
     embedding_batch_size: int = 512
 
     # Splitter
-    splitter_chunk_size: int = 1000
-    splitter_chunk_overlap: int = 200
+    # 400/50 keeps chunks inside all-MiniLM-L6-v2's 256-token limit (~750-900 chars),
+    # so the embedder never silently truncates a chunk's tail.
+    splitter_chunk_size: int = 400
+    splitter_chunk_overlap: int = 50
 
     # Retrieval defaults
     retrieval_top_k: int = 150

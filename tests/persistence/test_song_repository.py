@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 from app.models.song_document import SongDocument
+from app.persistence.mongo import song_repository as song_repo_module
 from app.persistence.mongo.song_repository import SongRepository
 
 
@@ -76,7 +77,7 @@ def test_get_all_returns_all_songs():
         _song(song_id=2, title="Song B").model_dump(),
     ]
 
-    results = repo.get_all()
+    results = list(repo.get_all())
 
     assert len(results) == 2
     col.find.assert_called_once_with({}, {"_id": 0})
@@ -158,3 +159,44 @@ def test_get_by_ids_empty_list_returns_empty():
 
     assert results == []
     col.find.assert_not_called()
+
+
+def test_ensure_indexes_creates_unique_index_on_song_id():
+    repo, col = _repo()
+
+    repo.ensure_indexes()
+
+    col.create_index.assert_called_once_with("song_id", unique=True)
+
+
+def test_get_by_ids_chunks_large_in_queries(monkeypatch):
+    monkeypatch.setattr(song_repo_module, "_IN_CHUNK", 2)
+    repo, col = _repo()
+    # 5 ids => chunks of [1,2], [3,4], [5]
+    col.find.side_effect = [
+        [_song(song_id=1).model_dump(), _song(song_id=2).model_dump()],
+        [_song(song_id=3).model_dump(), _song(song_id=4).model_dump()],
+        [_song(song_id=5).model_dump()],
+    ]
+
+    results = repo.get_by_ids([1, 2, 3, 4, 5])
+
+    assert sorted(s.song_id for s in results) == [1, 2, 3, 4, 5]
+    assert col.find.call_count == 3
+    assert col.find.call_args_list[0][0][0] == {"song_id": {"$in": [1, 2]}}
+    assert col.find.call_args_list[1][0][0] == {"song_id": {"$in": [3, 4]}}
+    assert col.find.call_args_list[2][0][0] == {"song_id": {"$in": [5]}}
+
+
+def test_get_by_ids_stream_chunks_large_in_queries(monkeypatch):
+    monkeypatch.setattr(song_repo_module, "_IN_CHUNK", 2)
+    repo, col = _repo()
+    col.find.side_effect = [
+        [_song(song_id=1).model_dump(), _song(song_id=2).model_dump()],
+        [_song(song_id=3).model_dump()],
+    ]
+
+    results = list(repo.get_by_ids_stream([1, 2, 3]))
+
+    assert sorted(s.song_id for s in results) == [1, 2, 3]
+    assert col.find.call_count == 2

@@ -23,7 +23,6 @@ RECENCY_DECAY_YEARS = 5.0
 class HybridRerankerService:
     """Weighted-sum reranker: lyrics + audio + profile + popularity + recency."""
 
-    TODAY_YEAR = date.today().year
     _AUDIO_FEATURE_ORDER = ("valence", "energy", "danceability",
                             "acousticness", "instrumentalness", "tempo_norm")
 
@@ -37,17 +36,31 @@ class HybridRerankerService:
         out: list[RankedSongCandidate] = []
         for c in candidates:
             lyrics_sim = c.best_lyrics_similarity
-            audio_sim  = self._audio_similarity(prompt_vec, c.audio_features)
             profile    = self._profile_affinity(c, req.user_profile)
             pop_score  = self._popularity_score(c.popularity)
             rec_score  = self._recency_score(c.release_date)
-            breakdown = ScoreBreakdown(
-                score_lyrics     = w.w_lyrics     * lyrics_sim,
-                score_audio      = w.w_audio      * audio_sim,
-                score_profile    = w.w_profile    * profile,
-                score_popularity = w.w_popularity * pop_score,
-                score_recency    = w.w_recency    * rec_score,
-            )
+            if c.audio_features is None:
+                # Lyrics-only song (no Spotify audio): drop the audio axis and
+                # renormalize the remaining weights so its total stays comparable
+                # to audio-complete songs instead of being penalized by w_audio.
+                denom = 1.0 - w.w_audio
+                scale = (1.0 / denom) if abs(denom) > 1e-9 else 1.0
+                breakdown = ScoreBreakdown(
+                    score_lyrics     = w.w_lyrics     * lyrics_sim * scale,
+                    score_audio      = 0.0,
+                    score_profile    = w.w_profile    * profile    * scale,
+                    score_popularity = w.w_popularity * pop_score  * scale,
+                    score_recency    = w.w_recency    * rec_score  * scale,
+                )
+            else:
+                audio_sim = self._audio_similarity(prompt_vec, c.audio_features)
+                breakdown = ScoreBreakdown(
+                    score_lyrics     = w.w_lyrics     * lyrics_sim,
+                    score_audio      = w.w_audio      * audio_sim,
+                    score_profile    = w.w_profile    * profile,
+                    score_popularity = w.w_popularity * pop_score,
+                    score_recency    = w.w_recency    * rec_score,
+                )
             total = (breakdown.score_lyrics + breakdown.score_audio
                      + breakdown.score_profile + breakdown.score_popularity
                      + breakdown.score_recency)
@@ -92,8 +105,9 @@ class HybridRerankerService:
         # Already linear — no alternative needed.
         return min(popularity, POPULARITY_CEILING) / float(POPULARITY_CEILING)
 
-    @classmethod
-    def _recency_score(cls, release_date: date) -> float:
+    @staticmethod
+    def _recency_score(release_date: date) -> float:
         # Alternative: max(0.0, 1.0 - years_old / 20) — linear decay; less harsh on old songs.
-        years_old = cls.TODAY_YEAR - release_date.year
+        # date.today() per call so a long-running process doesn't freeze the reference year.
+        years_old = date.today().year - release_date.year
         return exp(-years_old / RECENCY_DECAY_YEARS)

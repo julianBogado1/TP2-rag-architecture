@@ -18,7 +18,10 @@ def _build_pipeline() -> tuple[IndexingPipeline, MongoClient]:
         loader=LoaderService(
             repo=SongRepository(client[settings.mongo_db_name])
         ),
-        splitter=SplitterService(chunk_size=1000, chunk_overlap=200),
+        splitter=SplitterService(
+            chunk_size=settings.splitter_chunk_size,
+            chunk_overlap=settings.splitter_chunk_overlap,
+        ),
         embedder=EmbedderService(
             vector_repo=PineconeRepository(
                 api_key=settings.pinecone_api_key,

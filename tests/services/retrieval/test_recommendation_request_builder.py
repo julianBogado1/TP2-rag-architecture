@@ -37,7 +37,18 @@ def test_obscure_mode_inverts_popularity_weight(sample_request_context, sample_p
     score = sample_prompt_score.model_copy(update={"wants_obscure_songs": 0.8})
     builder = RecommendationRequestBuilder(_settings())
     req = builder.build(sample_request_context, score, sample_user_profile)
-    assert req.ranking_weights.w_popularity == -0.05
+    # Weights are renormalized after presets, so the value is no longer exactly -0.05,
+    # but it stays negative (popularity inverted) — that's the obscure-mode behavior.
+    assert req.ranking_weights.w_popularity < 0
+
+
+def test_weights_renormalized_to_sum_one(sample_request_context, sample_prompt_score, sample_user_profile):
+    builder = RecommendationRequestBuilder(_settings())
+    for update in ({"wants_lyrics_focus": 0.9}, {"wants_obscure_songs": 0.8}, {"wants_mood_focus": 0.9}):
+        score = sample_prompt_score.model_copy(update=update)
+        w = builder.build(sample_request_context, score, sample_user_profile).ranking_weights
+        total = w.w_lyrics + w.w_audio + w.w_profile + w.w_popularity + w.w_recency
+        assert abs(total - 1.0) < 1e-6
 
 
 def test_recent_songs_filter(sample_request_context, sample_prompt_score, sample_user_profile):

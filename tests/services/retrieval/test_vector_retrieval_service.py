@@ -13,8 +13,8 @@ def _meta(song_id, popularity=70, language="es", genres=("pop",), valence=0.8, t
         "artist_name": "artist",
         "genres": list(genres),
         "release_date": "2024",
-        "song_characteristics_chunk": json.dumps({"popularity": popularity, "tempo": tempo, "language": language}),
-        "audio_features_chunk": json.dumps({"valence": valence, "energy": 0.7, "danceability": 0.7, "acousticness": 0.1, "instrumentalness": 0.0}),
+        "song_characteristics_chunk": json.dumps({"popularity": popularity, "language": language}),
+        "audio_features_chunk": json.dumps({"valence": valence, "energy": 0.7, "danceability": 0.7, "acousticness": 0.1, "instrumentalness": 0.0, "tempo": tempo}),
     }
 
 
@@ -58,7 +58,18 @@ def test_returns_candidate_chunks_with_parsed_audio():
     assert cand.song_id == "1"
     assert cand.metadata.popularity == 70
     assert cand.metadata.audio_features.valence == 0.8
-    assert 0 < cand.metadata.audio_features.tempo_norm < 1
+    assert cand.metadata.audio_features.tempo_norm == 120 / 250.0
+
+
+def test_song_with_audio_parses_all_six_features():
+    fake_repo = FakePineconeRepository()
+    fake_repo.upsert_batch([("1_0", [1.0, 0.0, 0.0], _meta(1, valence=0.6, tempo=100))])
+    svc = VectorRetrievalService(fake_repo)
+    result = svc.retrieve(_request(top_k=5), [1.0, 0.0, 0.0])
+    af = result[0].metadata.audio_features
+    assert af is not None
+    assert af.valence == 0.6
+    assert af.tempo_norm == 100 / 250.0
 
 
 def test_filters_disliked_genres():
@@ -94,21 +105,23 @@ def test_filters_language():
     assert [c.song_id for c in result] == ["1"]
 
 
-def test_malformed_json_is_skipped_not_crash():
+def test_malformed_json_kept_without_audio():
     fake_repo = FakePineconeRepository()
     bad_meta = _meta(1)
     bad_meta["audio_features_chunk"] = "{ not json"
     fake_repo.upsert_batch([("1_0", [1.0, 0.0, 0.0], bad_meta)])
     svc = VectorRetrievalService(fake_repo)
     result = svc.retrieve(_request(), [1.0, 0.0, 0.0])
-    assert result == []
+    assert len(result) == 1
+    assert result[0].metadata.audio_features is None
 
 
-def test_incomplete_audio_is_skipped():
+def test_incomplete_audio_kept_without_audio():
     fake_repo = FakePineconeRepository()
     bad_meta = _meta(1)
     bad_meta["audio_features_chunk"] = json.dumps({"valence": 0.5})  # missing other 4
     fake_repo.upsert_batch([("1_0", [1.0, 0.0, 0.0], bad_meta)])
     svc = VectorRetrievalService(fake_repo)
     result = svc.retrieve(_request(), [1.0, 0.0, 0.0])
-    assert result == []
+    assert len(result) == 1
+    assert result[0].metadata.audio_features is None

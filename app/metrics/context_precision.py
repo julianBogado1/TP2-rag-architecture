@@ -19,9 +19,10 @@ def context_precision_at_k(
         return 0.0
 
     numerator = 0.0
+    tp = 0
     for i, song in enumerate(top, start=1):
         if song.song_id in gt_song_ids:
-            tp_at_i = sum(1 for s in top[:i] if s.song_id in gt_song_ids)
-            numerator += tp_at_i / i
+            tp += 1
+            numerator += tp / i
 
     return numerator / total_relevant

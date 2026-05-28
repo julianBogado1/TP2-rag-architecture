@@ -56,6 +56,21 @@ def test_song_document_with_spotify_fields():
     assert song.track_genre == "rap"
 
 
+def test_nan_float_fields_coerced_to_none():
+    song = SongDocument(**_genius_fields(), tempo=float("nan"), valence=float("nan"))
+    assert song.tempo is None
+    assert song.valence is None
+
+
+def test_year_and_views_optional():
+    fields = _genius_fields()
+    fields.pop("year")
+    fields.pop("views")
+    song = SongDocument(**fields)
+    assert song.year is None
+    assert song.views is None
+
+
 def test_song_document_missing_required_genius_field_raises():
     with pytest.raises(ValidationError):
         SongDocument(

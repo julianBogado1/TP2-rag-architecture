@@ -21,8 +21,8 @@ class LoaderService:
                     "song_id": song.song_id,
                     "track_name": song.title,
                     "artist_name": song.artist,
-                    "genres": [song.tag],
-                    "release_date": str(song.year),
+                    "genres": [song.tag] if song.tag else [],
+                    "release_date": str(song.year) if song.year else "",
                     "song_characteristics_chunk": json.dumps(self._build_song_characteristics(song)),
                     "audio_features_chunk": json.dumps(self._build_audio_features(song)),
                 },
@@ -34,7 +34,6 @@ class LoaderService:
             "popularity": song.popularity,
             "duration_ms": song.duration_ms,
             "explicit": song.explicit,
-            "tempo": song.tempo,
             "time_signature": song.time_signature,
             "language": song.language
         }
@@ -52,6 +51,7 @@ class LoaderService:
             "acousticness": song.acousticness,
             "instrumentalness": song.instrumentalness,
             "liveness": song.liveness,
-            "valence": song.valence
+            "valence": song.valence,
+            "tempo": song.tempo
         }
         return {k: v for k, v in fields.items() if v is not None}

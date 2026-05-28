@@ -70,7 +70,10 @@ def main():
         batch_size=settings.embedding_batch_size,
     )
     loader = LoaderService(repo=song_repo)
-    splitter = SplitterService()
+    splitter = SplitterService(
+        chunk_size=settings.splitter_chunk_size,
+        chunk_overlap=settings.splitter_chunk_overlap,
+    )
     pipeline = IndexingPipeline(loader=loader, splitter=splitter, embedder=embedder)
 
     logger.info("Starting indexing pipeline for sampled songs...")

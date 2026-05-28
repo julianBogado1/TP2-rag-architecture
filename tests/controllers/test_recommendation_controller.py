@@ -1,14 +1,16 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from app.controllers.recommendation_controller import build_recommendation_router
-from app.core.exceptions import UserNotFoundError, LLMProviderError
+from app.core.exceptions import UserNotFoundError, LLMProviderError, VectorStoreError
 from app.models.recommendation_response import RecommendationResponse, SongRecommendation
 
 
 class StubOrchestrator:
-    def __init__(self, *, raise_user_not_found=False, raise_llm=False, response=None):
+    def __init__(self, *, raise_user_not_found=False, raise_llm=False,
+                 raise_vector_store=False, response=None):
         self._raise_user_not_found = raise_user_not_found
         self._raise_llm = raise_llm
+        self._raise_vector_store = raise_vector_store
         self._response = response
 
     def recommend(self, user_id, raw_prompt):
@@ -16,6 +18,8 @@ class StubOrchestrator:
             raise UserNotFoundError(user_id)
         if self._raise_llm:
             raise LLMProviderError("boom")
+        if self._raise_vector_store:
+            raise VectorStoreError("pinecone down")
         return self._response
 
 
@@ -44,6 +48,12 @@ def test_user_not_found_returns_404():
 
 def test_llm_error_returns_502():
     client = _app(StubOrchestrator(raise_llm=True))
+    r = client.post("/recommend", json={"user_id": "u", "raw_prompt": "hola"})
+    assert r.status_code == 502
+
+
+def test_vector_store_error_returns_502():
+    client = _app(StubOrchestrator(raise_vector_store=True))
     r = client.post("/recommend", json={"user_id": "u", "raw_prompt": "hola"})
     assert r.status_code == 502
 

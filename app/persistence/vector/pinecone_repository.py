@@ -1,7 +1,10 @@
+import time
 from pinecone import Pinecone, ServerlessSpec
+from app.core.exceptions import VectorStoreError
 from app.models.raw_pinecone_match import RawPineconeMatch
 
 EMBEDDING_DIMENSION = 384
+_MAX_RETRIES = 3
 
 
 class PineconeRepository:
@@ -25,13 +28,27 @@ class PineconeRepository:
         self._index.upsert(vectors=[(doc_id, embedding, metadata)])
 
     def upsert_batch(self, records: list[tuple[str, list[float], dict]]) -> None:
-        self._index.upsert(vectors=records)
+        for attempt in range(_MAX_RETRIES):
+            try:
+                self._index.upsert(vectors=records)
+                return
+            except Exception as e:
+                if attempt == _MAX_RETRIES - 1:
+                    raise VectorStoreError(
+                        f"upsert failed after {_MAX_RETRIES} attempts: {e}"
+                    ) from e
+                time.sleep(2 ** attempt)
 
     def clear(self) -> None:
         self._index.delete(delete_all=True)
 
     def query(self, vector: list[float], top_k: int) -> list[RawPineconeMatch]:
-        result = self._index.query(vector=vector, top_k=top_k, include_metadata=True)
+        try:
+            result = self._index.query(
+                vector=vector, top_k=top_k, include_metadata=True
+            )
+        except Exception as e:
+            raise VectorStoreError(f"query failed: {e}") from e
         matches = _extract_matches(result)
         return [
             RawPineconeMatch(

@@ -26,10 +26,10 @@ class VectorRetrievalService:
         raw_matches = self._repo.query(query_vec, top_k=req.top_k_retrieval * OVERFETCH_MULTIPLIER)
         candidates: list[CandidateChunk] = []
         for m in raw_matches:
+            # audio is None for lyrics-only songs (no Spotify match): keep them and
+            # let the reranker score lyrics-only. chars is always a dict (never None).
             audio = self._parse_audio(m.metadata.get("audio_features_chunk"))
             chars = self._parse_chars(m.metadata.get("song_characteristics_chunk"))
-            if audio is None or chars is None:
-                continue
             if not self._passes_filters(m.metadata, chars, req.metadata_filters):
                 continue
             candidates.append(self._build_candidate_chunk(m, audio, chars))
@@ -39,12 +39,17 @@ class VectorRetrievalService:
 
     @staticmethod
     def _parse_audio(blob: str | None) -> ParsedAudioFeatures | None:
-        """Return a complete ParsedAudioFeatures or None to signal 'skip this chunk'."""
+        """Return parsed audio features, or None meaning 'no audio' (the song is
+        still kept and scored lyrics-only). Missing/empty/malformed/incomplete all
+        map to None."""
         if not blob:
             return None
         try:
             data = json.loads(blob)
         except (json.JSONDecodeError, TypeError):
+            return None
+        required = ("valence", "energy", "danceability", "acousticness", "instrumentalness")
+        if not isinstance(data, dict) or not all(k in data for k in required):
             return None
         try:
             return ParsedAudioFeatures(
@@ -55,17 +60,19 @@ class VectorRetrievalService:
                 instrumentalness=data["instrumentalness"],
                 tempo_norm=_normalize_tempo(data.get("tempo")),
             )
-        except (KeyError, TypeError, ValueError):
+        except (TypeError, ValueError):
             return None
 
     @staticmethod
-    def _parse_chars(blob: str | None) -> dict | None:
+    def _parse_chars(blob: str | None) -> dict:
+        """Return characteristics dict; empty dict on missing/malformed (never drops a song)."""
         if not blob:
             return {}
         try:
-            return json.loads(blob)
+            parsed = json.loads(blob)
         except (json.JSONDecodeError, TypeError):
-            return None
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
 
     @staticmethod
     def _passes_filters(meta: dict, chars: dict, filters: MetadataFilters) -> bool:
@@ -91,9 +98,9 @@ class VectorRetrievalService:
         return True
 
     @staticmethod
-    def _build_candidate_chunk(m: RawPineconeMatch, audio: ParsedAudioFeatures, chars: dict) -> CandidateChunk:
+    def _build_candidate_chunk(m: RawPineconeMatch, audio: ParsedAudioFeatures | None, chars: dict) -> CandidateChunk:
         year = _safe_year(m.metadata.get("release_date")) or DEFAULT_RELEASE_YEAR_FALLBACK
-        af = AudioFeatures(
+        af = None if audio is None else AudioFeatures(
             valence=audio.valence,
             energy=audio.energy,
             danceability=audio.danceability,

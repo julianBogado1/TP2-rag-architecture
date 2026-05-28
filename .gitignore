@@ -8,7 +8,9 @@ __pycache__/
 dist/
 build/
 .vscode/
-
+samples/
+data/
+logs/
 # AI related
 .claude
 .opencode

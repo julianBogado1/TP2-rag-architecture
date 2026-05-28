@@ -20,6 +20,16 @@ _ARTIST_SPLIT = re.compile(
 )
 
 
+# Only the Spotify fields consumed downstream by the ingest service. Storing a slim
+# dict (not the full raw row) keeps the in-memory index small for streamed datasets.
+_SLIM_FIELDS = (
+    "track_id", "album_name", "popularity", "duration_ms", "explicit",
+    "danceability", "energy", "key", "loudness", "mode", "speechiness",
+    "acousticness", "instrumentalness", "liveness", "valence", "tempo",
+    "time_signature", "track_genre",
+)
+
+
 def _strip_accents(s: str) -> str:
     return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
 
@@ -58,20 +68,23 @@ class SongMatcher:
 
     def build_index(self, rows: Iterable[dict]) -> None:
         for row in rows:
-            if row["track_name"] is None or row["artists"] is None:
+            if row.get("track_name") is None or row.get("artists") is None:
                 continue
             title = normalize_title(row["track_name"])
             if not title:
                 continue
+            slim = {k: row.get(k) for k in _SLIM_FIELDS}
             for artist in split_artists(row["artists"]):
                 key = (title, artist)
                 existing = self._index.get(key)
                 # Collision -> keep the more popular row.
                 # Alternative: keep first-seen (simpler, but order-dependent).
-                if existing is None or (row.get("popularity") or 0) > (existing.get("popularity") or 0):
-                    self._index[key] = row
+                if existing is None or (slim.get("popularity") or 0) > (existing.get("popularity") or 0):
+                    self._index[key] = slim
 
     def lookup(self, genius_row: dict) -> dict | None:
+        if genius_row.get("title") is None or genius_row.get("artist") is None:
+            return None
         title = normalize_title(genius_row["title"])
         if not title:
             return None

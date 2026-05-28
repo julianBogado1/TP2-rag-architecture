@@ -2,12 +2,21 @@ from pymongo.database import Database
 from pymongo.collection import Collection
 from app.models.song_document import SongDocument
 
+_IN_CHUNK = 5000
+
 
 class SongRepository:
     COLLECTION = "songs"
 
     def __init__(self, db: Database) -> None:
         self._collection: Collection = db[self.COLLECTION]
+
+    def ensure_indexes(self) -> None:
+        self._collection.create_index("song_id", unique=True)
+
+    def _chunked(self, ids: list[int]):
+        for i in range(0, len(ids), _IN_CHUNK):
+            yield ids[i:i + _IN_CHUNK]
 
     def drop_collection(self) -> None:
         self._collection.drop()
@@ -47,13 +56,19 @@ class SongRepository:
     def get_by_ids(self, song_ids: list[int]) -> list[SongDocument]:
         if not song_ids:
             return []
-        docs = self._collection.find({"song_id": {"$in": song_ids}}, {"_id": 0})
-        return [SongDocument(**doc) for doc in docs]
+        out: list[SongDocument] = []
+        for chunk in self._chunked(song_ids):
+            out.extend(
+                SongDocument(**doc)
+                for doc in self._collection.find(
+                    {"song_id": {"$in": chunk}}, {"_id": 0}
+                )
+            )
+        return out
 
     def get_by_ids_stream(self, song_ids: list[int]):
-        cursor = self._collection.find(
-            {"song_id": {"$in": song_ids}},
-            {"_id": 0},
-        )
-        for doc in cursor:
-            yield SongDocument(**doc)
+        for chunk in self._chunked(song_ids):
+            for doc in self._collection.find(
+                {"song_id": {"$in": chunk}}, {"_id": 0}
+            ):
+                yield SongDocument(**doc)

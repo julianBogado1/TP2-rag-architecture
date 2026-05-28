@@ -9,11 +9,11 @@ class TopNSelectorService:
 
     def select(self, ranked: list[RankedSongCandidate], top_n: int) -> list[TopRecommendedSong]:
         sorted_ranked = sorted(ranked, key=lambda r: r.score_total, reverse=True)
-        seen_titles: set[str] = set()
+        seen_titles: set[tuple[str, str]] = set()
         per_artist: dict[str, int] = {}
         out: list[TopRecommendedSong] = []
         for r in sorted_ranked:
-            key = r.track_name.strip().lower()
+            key = (r.track_name.strip().lower(), r.artist_name.strip().lower())
             if key in seen_titles:
                 continue
             if per_artist.get(r.artist_name, 0) >= self._max_per_artist:

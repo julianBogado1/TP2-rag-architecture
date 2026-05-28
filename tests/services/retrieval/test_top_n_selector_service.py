@@ -41,9 +41,19 @@ def test_caps_per_artist():
 def test_dedup_by_normalized_title():
     svc = TopNSelectorService(max_per_artist=10)
     candidates = [
-        _ranked("1", 0.9, title="Friday Lights"),
-        _ranked("2", 0.8, title="friday lights"),
-        _ranked("3", 0.7, title="Other"),
+        _ranked("1", 0.9, title="Friday Lights", artist="A"),
+        _ranked("2", 0.8, title="friday lights", artist="A"),
+        _ranked("3", 0.7, title="Other", artist="A"),
     ]
     out = svc.select(candidates, top_n=10)
     assert [r.song_id for r in out] == ["1", "3"]
+
+
+def test_same_title_different_artist_both_kept():
+    svc = TopNSelectorService(max_per_artist=10)
+    candidates = [
+        _ranked("1", 0.9, title="Hello", artist="Adele"),
+        _ranked("2", 0.8, title="Hello", artist="Lionel Richie"),
+    ]
+    out = svc.select(candidates, top_n=10)
+    assert [r.song_id for r in out] == ["1", "2"]

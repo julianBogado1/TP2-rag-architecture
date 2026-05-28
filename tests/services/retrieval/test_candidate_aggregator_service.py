@@ -45,6 +45,23 @@ def test_empty_chunks_returns_empty():
     assert svc.aggregate([]) == []
 
 
+def test_non_integer_song_id_is_dropped_with_warning(caplog):
+    import logging
+    chunks = [_chunk("abc_0", "abc", 0.9), _chunk("2_0", 2, 0.6)]
+    song_repo = FakeSongRepository(songs=[_song(2, "lyrics two")])
+    svc = CandidateAggregatorService(song_repo=song_repo, max_evidence_chunks=3)
+
+    with caplog.at_level(logging.WARNING):
+        cands = svc.aggregate(chunks)
+
+    # non-integer id is still returned as a candidate (it was grouped), but it is
+    # excluded from the Mongo lyrics lookup and a warning is logged.
+    assert any("non-integer song_id" in rec.message for rec in caplog.records)
+    by_id = {c.song_id: c for c in cands}
+    assert by_id["abc"].best_lyrics_chunks == []
+    assert "lyrics two" in by_id["2"].best_lyrics_chunks[0]
+
+
 def test_caps_evidence_chunks_to_max():
     chunks = [_chunk(f"1_{i}", 1, 0.5) for i in range(10)]
     song_repo = FakeSongRepository(songs=[_song(1, "\n".join(f"line {i}" for i in range(10)))])

@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class IndexingResult:
     total_docs: int
+    # In the streaming design chunks are embedded as they are produced, so
+    # total_chunks always equals total_indexed (kept for API/back-compat).
     total_chunks: int
     total_indexed: int
 

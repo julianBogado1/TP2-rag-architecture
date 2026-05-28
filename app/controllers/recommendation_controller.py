@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from app.core.exceptions import UserNotFoundError, LLMProviderError, VectorStoreError
+from app.core.exceptions import (
+    UserNotFoundError, LLMProviderError, VectorStoreError, RecommendationError,
+)
 from app.services.retrieval.recommendation_orchestrator import RecommendationOrchestrator
 from app.models.recommendation_response import RecommendationResponse
 
@@ -23,5 +25,7 @@ def build_recommendation_router(orchestrator: RecommendationOrchestrator) -> API
             raise HTTPException(502, "Upstream model failure")
         except VectorStoreError:
             raise HTTPException(502, "Vector store failure")
+        except RecommendationError:
+            raise HTTPException(502, "Recommendation pipeline failure")
 
     return router

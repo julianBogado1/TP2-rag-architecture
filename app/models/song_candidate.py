@@ -18,7 +18,7 @@ class SongMetadata(BaseModel):
     genres: list[str]
     popularity: int
     release_date: date
-    audio_features: AudioFeatures
+    audio_features: AudioFeatures | None = None
 
 
 class SongVectorDocument(BaseModel):
@@ -32,6 +32,8 @@ class SongVectorDocument(BaseModel):
 class CandidateChunk(BaseModel):
     chunk_id: str
     song_id: str
+    # Empty at retrieval time; evidence text is filled later by the aggregator
+    # from Mongo (kept here for shape parity with the vector document).
     lyrics_chunk: str
     lyrics_similarity: float
     metadata: SongMetadata
@@ -46,4 +48,4 @@ class CandidateSong(BaseModel):
     release_date: date
     best_lyrics_chunks: list[str]
     best_lyrics_similarity: float
-    audio_features: AudioFeatures
+    audio_features: AudioFeatures | None = None

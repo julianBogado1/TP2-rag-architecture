@@ -5,6 +5,7 @@ from itertools import islice
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 
+from app.core.exceptions import VectorStoreError
 from app.persistence.vector.pinecone_repository import PineconeRepository
 
 logger = logging.getLogger(__name__)
@@ -43,13 +44,27 @@ class EmbedderService:
                     )
                     for j in range(len(batch))
                 ]
-                if pending is not None:
-                    pending.result()
-                pending = pool.submit(self._vector_repo.upsert_batch, records)
+                try:
+                    if pending is not None:
+                        pending.result()
+                    pending = pool.submit(self._vector_repo.upsert_batch, records)
+                except VectorStoreError:
+                    logger.error(
+                        f"Upsert failed after {total} chunks indexed; "
+                        "rerun is idempotent (deterministic ids)."
+                    )
+                    raise
                 total += len(batch)
                 logger.info(f"Indexed {total} chunks so far.")
-            if pending is not None:
-                pending.result()
+            try:
+                if pending is not None:
+                    pending.result()
+            except VectorStoreError:
+                logger.error(
+                    f"Upsert failed after {total} chunks indexed; "
+                    "rerun is idempotent (deterministic ids)."
+                )
+                raise
         return total
 
     def embed_query(self, text: str) -> list[float]:

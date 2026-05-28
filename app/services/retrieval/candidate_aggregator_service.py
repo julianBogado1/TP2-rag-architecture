@@ -1,4 +1,8 @@
+import logging
+
 from app.models.song_candidate import CandidateChunk, CandidateSong
+
+logger = logging.getLogger(__name__)
 
 
 class CandidateAggregatorService:
@@ -15,7 +19,12 @@ class CandidateAggregatorService:
         for c in chunks:
             groups.setdefault(c.song_id, []).append(c)
 
-        song_ids = [int(sid) for sid in groups.keys() if sid.isdigit()]
+        song_ids: list[int] = []
+        for sid in groups.keys():
+            try:
+                song_ids.append(int(sid))
+            except (ValueError, TypeError):
+                logger.warning("Dropping candidate with non-integer song_id: %r", sid)
         lyrics_by_id = {str(s.song_id): s.lyrics for s in self._song_repo.get_by_ids(song_ids)}
 
         return [

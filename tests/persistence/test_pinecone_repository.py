@@ -1,5 +1,8 @@
+import pytest
 from unittest.mock import MagicMock
+from app.core.exceptions import VectorStoreError
 from app.models.raw_pinecone_match import RawPineconeMatch
+from app.persistence.vector import pinecone_repository as pinecone_module
 from app.persistence.vector.pinecone_repository import PineconeRepository
 
 
@@ -68,3 +71,34 @@ def test_query_handles_pinecone_v3_object_response():
     assert [m.chunk_id for m in result] == ["42_3", "13_0"]
     assert result[0].metadata == {"song_id": 42}
     assert result[1].metadata == {}
+
+
+def test_upsert_batch_succeeds_after_transient_failure(monkeypatch):
+    monkeypatch.setattr(pinecone_module.time, "sleep", lambda *_: None)
+    repo, fake_index = _repo_with_fake_index()
+    fake_index.upsert.side_effect = [RuntimeError("transient"), None]
+
+    records = [("a", [0.1] * 384, {"song_id": 1})]
+    repo.upsert_batch(records)
+
+    assert fake_index.upsert.call_count == 2
+    fake_index.upsert.assert_called_with(vectors=records)
+
+
+def test_upsert_batch_raises_vector_store_error_on_persistent_failure(monkeypatch):
+    monkeypatch.setattr(pinecone_module.time, "sleep", lambda *_: None)
+    repo, fake_index = _repo_with_fake_index()
+    fake_index.upsert.side_effect = RuntimeError("down")
+
+    with pytest.raises(VectorStoreError):
+        repo.upsert_batch([("a", [0.1] * 384, {"song_id": 1})])
+
+    assert fake_index.upsert.call_count == pinecone_module._MAX_RETRIES
+
+
+def test_query_wraps_sdk_error_as_vector_store_error():
+    repo, fake_index = _repo_with_fake_index()
+    fake_index.query.side_effect = RuntimeError("boom")
+
+    with pytest.raises(VectorStoreError):
+        repo.query([0.1] * 384, top_k=10)

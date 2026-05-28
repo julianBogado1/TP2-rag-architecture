@@ -10,6 +10,7 @@ Requires:
 Usage:
     python scripts/run_evaluation.py
 """
+import sys
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,9 @@ from uuid import uuid4
 
 from pymongo import MongoClient
 from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
 
 load_dotenv()
 
@@ -114,45 +118,52 @@ def main() -> None:
     print(header)
     print("-" * len(header))
 
-    for tc in test_cases:
-        label = tc["label"]
-        prompt = tc["prompt"]
-        user_id = tc["user_id"]
-        gt_ids = set(tc["gt_song_ids"])
+    try:
+        for tc in test_cases:
+            label = tc["label"]
+            prompt = tc["prompt"]
+            user_id = tc["user_id"]
+            gt_ids = set(tc["gt_song_ids"])
 
-        top_songs, response = run_pipeline(svc, user_id, prompt)
-        if top_songs is None:
-            print(f"{label:<14} — no results")
-            continue
+            try:
+                top_songs, response = run_pipeline(svc, user_id, prompt)
+                if top_songs is None:
+                    print(f"{label:<14} — no results")
+                    continue
 
-        cp = context_precision_at_k(top_songs, gt_ids, K)
-        rec = recall_at_k(top_songs, gt_ids, K)
-        faith = faithfulness_score(response, top_songs, svc["llm"])
-        ar = answer_relevance_score(prompt, response, svc["embedder"], svc["llm"])
+                cp = context_precision_at_k(top_songs, gt_ids, K)
+                rec = recall_at_k(top_songs, gt_ids, K)
+                faith = faithfulness_score(response, top_songs, svc["llm"])
+                ar = answer_relevance_score(prompt, response, svc["embedder"], svc["llm"])
 
-        print(f"{label:<14} {cp:>6.3f} {rec:>6.3f} {faith:>6.3f} {ar:>7.3f}")
+                print(f"{label:<14} {cp:>6.3f} {rec:>6.3f} {faith:>6.3f} {ar:>7.3f}")
 
-        results.append({
-            "label": label,
-            "prompt": prompt,
-            "context_precision_at_k": round(cp, 4),
-            "recall_at_k": round(rec, 4),
-            "faithfulness": round(faith, 4),
-            "answer_relevance": round(ar, 4),
-        })
+                results.append({
+                    "label": label,
+                    "prompt": prompt,
+                    "context_precision_at_k": round(cp, 4),
+                    "recall_at_k": round(rec, 4),
+                    "faithfulness": round(faith, 4),
+                    "answer_relevance": round(ar, 4),
+                })
+            except Exception as e:  # isolate one bad case from the whole run
+                print(f"{label:<14} — ERROR: {e}")
+                results.append({"label": label, "prompt": prompt, "error": str(e)})
 
-    if results:
-        avg_cp = sum(r["context_precision_at_k"] for r in results) / len(results)
-        avg_rec = sum(r["recall_at_k"] for r in results) / len(results)
-        avg_faith = sum(r["faithfulness"] for r in results) / len(results)
-        avg_ar = sum(r["answer_relevance"] for r in results) / len(results)
-        print("-" * len(header))
-        print(f"{'AVERAGE':<14} {avg_cp:>6.3f} {avg_rec:>6.3f} {avg_faith:>6.3f} {avg_ar:>7.3f}")
+            # write incrementally so a later crash doesn't discard prior results
+            RESULTS_PATH.write_text(json.dumps(results, indent=2))
 
-        RESULTS_PATH.write_text(json.dumps(results, indent=2))
-        print(f"\nSaved to {RESULTS_PATH}")
-
-    svc["mongo"].close()
+        scored = [r for r in results if "error" not in r]
+        if scored:
+            avg_cp = sum(r["context_precision_at_k"] for r in scored) / len(scored)
+            avg_rec = sum(r["recall_at_k"] for r in scored) / len(scored)
+            avg_faith = sum(r["faithfulness"] for r in scored) / len(scored)
+            avg_ar = sum(r["answer_relevance"] for r in scored) / len(scored)
+            print("-" * len(header))
+            print(f"{'AVERAGE':<14} {avg_cp:>6.3f} {avg_rec:>6.3f} {avg_faith:>6.3f} {avg_ar:>7.3f}")
+            print(f"\nSaved to {RESULTS_PATH}")
+    finally:
+        svc["mongo"].close()
 
 
 if __name__ == "__main__":
