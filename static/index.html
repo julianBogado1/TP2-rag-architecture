@@ -8,524 +8,189 @@
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0a0a0c;
-      --surface: #111115;
-      --surface2: #18181f;
-      --border: rgba(255,255,255,0.07);
-      --accent: #c8a96e;
-      --accent2: #7c6af7;
-      --text: #e8e4dc;
-      --muted: #6b6876;
-      --danger: #e05c5c;
-      --success: #6ecfa0;
-      --glow: rgba(200, 169, 110, 0.15);
+      --bg: #0a0a0c; --surface: #111115; --surface2: #18181f;
+      --border: rgba(255,255,255,0.07); --accent: #c8a96e; --accent2: #7c6af7;
+      --text: #e8e4dc; --muted: #6b6876; --danger: #e05c5c; --success: #6ecfa0;
+      --glow: rgba(200,169,110,0.15);
     }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Instrument Sans', sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
+    body { background: var(--bg); color: var(--text); font-family: 'Instrument Sans', sans-serif; min-height: 100vh; overflow-x: hidden; }
     body::before {
-      content: '';
-      position: fixed; inset: 0;
+      content: ''; position: fixed; inset: 0;
       background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
       pointer-events: none; z-index: 1000; opacity: 0.4;
     }
-
-    .ambient {
-      position: fixed; border-radius: 50%;
-      filter: blur(120px); pointer-events: none; z-index: 0;
-    }
+    .ambient { position: fixed; border-radius: 50%; filter: blur(120px); pointer-events: none; z-index: 0; }
     .ambient-1 { width: 600px; height: 600px; top: -200px; right: -100px; background: rgba(124,106,247,0.06); }
     .ambient-2 { width: 400px; height: 400px; bottom: -100px; left: -100px; background: rgba(200,169,110,0.08); }
-
-    .app {
-      position: relative; z-index: 1;
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 48px 24px 80px;
-    }
-
-    header {
-      display: flex; align-items: flex-end; justify-content: space-between;
-      margin-bottom: 56px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 24px;
-    }
-    .logo {
-      font-family: 'Playfair Display', serif;
-      font-size: 2rem;
-      letter-spacing: -0.02em;
-    }
+    .app { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 48px 24px 80px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 56px; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
+    .logo { font-family: 'Playfair Display', serif; font-size: 2rem; letter-spacing: -0.02em; }
     .logo span { color: var(--accent); font-style: italic; }
     .tagline { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--muted); letter-spacing: 0.1em; }
-
-    .tabs {
-      display: flex; gap: 2px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 4px;
-      margin-bottom: 36px;
-      width: fit-content;
-    }
-    .tab {
-      padding: 8px 20px;
-      border-radius: 7px;
-      border: none;
-      background: transparent;
-      color: var(--muted);
-      font-family: 'Instrument Sans', sans-serif;
-      font-size: 0.85rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .tab.active {
-      background: var(--surface2);
-      color: var(--text);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-    }
-
+    .tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 4px; margin-bottom: 36px; width: fit-content; }
+    .tab { padding: 8px 20px; border-radius: 7px; border: none; background: transparent; color: var(--muted); font-family: 'Instrument Sans', sans-serif; font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .tab.active { background: var(--surface2); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
     .panel { display: none; animation: fadeIn 0.3s ease; }
     .panel.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-    .section-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      letter-spacing: 0.15em;
-      color: var(--muted);
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-
+    .section-label { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
     .field { margin-bottom: 24px; }
-    label {
-      display: block;
-      font-size: 0.82rem;
-      color: var(--muted);
-      margin-bottom: 6px;
-      letter-spacing: 0.02em;
-    }
-    input[type="text"], textarea, select {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-family: 'Instrument Sans', sans-serif;
-      font-size: 0.9rem;
-      padding: 10px 14px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      outline: none;
-      appearance: none;
-    }
-    input[type="text"]:focus, textarea:focus, select:focus {
-      border-color: rgba(200,169,110,0.5);
-      box-shadow: 0 0 0 3px var(--glow);
-    }
+    label { display: block; font-size: 0.82rem; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.02em; }
+    input[type="text"], textarea, select { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Instrument Sans', sans-serif; font-size: 0.9rem; padding: 10px 14px; transition: border-color 0.2s, box-shadow 0.2s; outline: none; appearance: none; }
+    input[type="text"]:focus, textarea:focus, select:focus { border-color: rgba(200,169,110,0.5); box-shadow: 0 0 0 3px var(--glow); }
     textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
-
-    .tag-input-wrap { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-    .tag {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 4px 10px 4px 12px;
-      font-size: 0.78rem;
-      display: flex; align-items: center; gap: 6px;
-      color: var(--text);
-    }
-    .tag .remove {
-      cursor: pointer; color: var(--muted);
-      font-size: 1rem; line-height: 1;
-      transition: color 0.15s;
-    }
+    .tag { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px 4px 12px; font-size: 0.78rem; display: flex; align-items: center; gap: 6px; color: var(--text); }
+    .tag .remove { cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; transition: color 0.15s; }
     .tag .remove:hover { color: var(--danger); }
-    .mini-input {
-      background: transparent;
-      border: none;
-      color: var(--text);
-      font-family: 'Instrument Sans', sans-serif;
-      font-size: 0.85rem;
-      outline: none;
-      min-width: 120px;
-      flex: 1;
-    }
-    .tag-container {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-      cursor: text;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .tag-container:focus-within {
-      border-color: rgba(200,169,110,0.5);
-      box-shadow: 0 0 0 3px var(--glow);
-    }
-
+    .mini-input { background: transparent; border: none; color: var(--text); font-family: 'Instrument Sans', sans-serif; font-size: 0.85rem; outline: none; min-width: 120px; flex: 1; }
+    .tag-container { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; cursor: text; transition: border-color 0.2s, box-shadow 0.2s; }
+    .tag-container:focus-within { border-color: rgba(200,169,110,0.5); box-shadow: 0 0 0 3px var(--glow); }
     .hint { font-size: 0.72rem; color: var(--muted); margin-top: 5px; }
-
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
-
     .prompt-wrap { position: relative; margin-bottom: 20px; }
-    .prompt-area {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      color: var(--text);
-      font-family: 'Instrument Sans', sans-serif;
-      font-size: 1rem;
-      padding: 16px 16px 52px;
-      resize: none;
-      min-height: 120px;
-      outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      line-height: 1.6;
-    }
-    .prompt-area:focus {
-      border-color: rgba(200,169,110,0.5);
-      box-shadow: 0 0 0 3px var(--glow);
-    }
+    .prompt-area { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text); font-family: 'Instrument Sans', sans-serif; font-size: 1rem; padding: 16px 16px 52px; resize: none; min-height: 120px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; line-height: 1.6; }
+    .prompt-area:focus { border-color: rgba(200,169,110,0.5); box-shadow: 0 0 0 3px var(--glow); }
     .prompt-area::placeholder { color: var(--muted); }
-    .prompt-footer {
-      position: absolute; bottom: 12px; left: 16px; right: 12px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
+    .prompt-footer { position: absolute; bottom: 12px; left: 16px; right: 12px; display: flex; justify-content: space-between; align-items: center; }
     .char-count { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--muted); }
-
-    .btn {
-      border: none; border-radius: 8px; cursor: pointer;
-      font-family: 'Instrument Sans', sans-serif;
-      font-weight: 600; font-size: 0.85rem;
-      padding: 10px 20px;
-      transition: all 0.2s;
-      display: inline-flex; align-items: center; gap: 7px;
-    }
-    .btn-primary {
-      background: var(--accent);
-      color: #0a0a0c;
-    }
+    .btn { border: none; border-radius: 8px; cursor: pointer; font-family: 'Instrument Sans', sans-serif; font-weight: 600; font-size: 0.85rem; padding: 10px 20px; transition: all 0.2s; display: inline-flex; align-items: center; gap: 7px; }
+    .btn-primary { background: var(--accent); color: #0a0a0c; }
     .btn-primary:hover { background: #d4b87a; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(200,169,110,0.3); }
     .btn-primary:active { transform: translateY(0); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-    .btn-ghost {
-      background: transparent;
-      color: var(--muted);
-      border: 1px solid var(--border);
-    }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn-ghost:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-    .user-id-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 28px; }
-    .user-id-row .field { flex: 1; margin-bottom: 0; }
-
+    .btn-full { width: 100%; justify-content: center; padding: 12px; font-size: 0.9rem; }
     .loading { display: none; align-items: center; gap: 12px; padding: 20px 0; }
     .loading.active { display: flex; }
-    .spinner {
-      width: 20px; height: 20px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
+    .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .loading-text { font-family: 'DM Mono', monospace; font-size: 0.78rem; color: var(--muted); }
-
-    /* Results */
     .results { display: none; }
     .results.active { display: block; animation: fadeIn 0.4s ease; }
-
-    .results-header {
-      display: flex; justify-content: space-between; align-items: flex-end;
-      margin-bottom: 28px;
-    }
-    .results-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.5rem;
-      font-style: italic;
-    }
+    .results-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; }
+    .results-title { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-style: italic; }
     .results-meta { font-size: 0.78rem; color: var(--muted); }
-
-    .mood-bar {
-      display: flex; flex-wrap: wrap; gap: 6px;
-      margin-bottom: 28px;
-    }
-    .mood-chip {
-      font-size: 0.72rem;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-family: 'DM Mono', monospace;
-      letter-spacing: 0.05em;
-    }
+    .mood-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+    .mood-chip { font-size: 0.72rem; padding: 4px 10px; border-radius: 20px; font-family: 'DM Mono', monospace; letter-spacing: 0.05em; }
     .mood-chip.mood { background: rgba(200,169,110,0.12); border: 1px solid rgba(200,169,110,0.25); color: var(--accent); }
     .mood-chip.audio { background: rgba(124,106,247,0.12); border: 1px solid rgba(124,106,247,0.25); color: #a99ff5; }
-
     .song-list { display: flex; flex-direction: column; gap: 10px; }
-
-    .song-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px 20px;
-      display: grid;
-      grid-template-columns: 36px 1fr auto;
-      gap: 16px;
-      align-items: center;
-      transition: border-color 0.2s, background 0.2s, transform 0.2s;
-      cursor: default;
-      animation: slideIn 0.4s ease both;
-    }
-    .song-card:hover {
-      border-color: rgba(200,169,110,0.2);
-      background: var(--surface2);
-      transform: translateX(3px);
-    }
-    @keyframes slideIn {
-      from { opacity: 0; transform: translateX(-12px); }
-      to { opacity: 1; transform: translateX(0); }
-    }
-
-    .rank-num {
-      font-family: 'Playfair Display', serif;
-      font-size: 1.4rem;
-      color: var(--muted);
-      text-align: center;
-      line-height: 1;
-    }
-    .song-card:hover .rank-num { color: var(--accent); }
-
+    .song-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; display: grid; grid-template-columns: 36px 1fr auto; gap: 16px; align-items: center; transition: border-color 0.2s, background 0.2s, transform 0.2s; cursor: default; animation: slideIn 0.4s ease both; }
+    .song-card:hover { border-color: rgba(200,169,110,0.2); background: var(--surface2); transform: translateX(3px); }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
     .song-info { overflow: hidden; }
-    .song-title {
-      font-weight: 600;
-      font-size: 0.95rem;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-bottom: 3px;
-    }
-    .song-artist {
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-    .song-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-    .song-tag {
-      font-size: 0.65rem;
-      font-family: 'DM Mono', monospace;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: rgba(255,255,255,0.05);
-      color: var(--muted);
-      letter-spacing: 0.05em;
-    }
-
+    .song-title { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+    .song-artist { font-size: 0.8rem; color: var(--muted); }
     .score-col { text-align: right; flex-shrink: 0; }
-    .score-val {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.85rem;
-      color: var(--accent);
-      font-weight: 500;
-    }
-    .score-bar {
-      width: 60px; height: 3px;
-      background: var(--border);
-      border-radius: 2px;
-      margin-top: 6px;
-      margin-left: auto;
-      overflow: hidden;
-    }
-    .score-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent2), var(--accent));
-      border-radius: 2px;
-      transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
-    }
-
-    .error-box {
-      display: none;
-      background: rgba(224,92,92,0.08);
-      border: 1px solid rgba(224,92,92,0.25);
-      border-radius: 10px;
-      padding: 14px 18px;
-      font-size: 0.85rem;
-      color: #f09090;
-      margin-bottom: 20px;
-    }
+    .score-val { font-family: 'DM Mono', monospace; font-size: 0.85rem; color: var(--accent); font-weight: 500; }
+    .score-bar { width: 60px; height: 3px; background: var(--border); border-radius: 2px; margin-top: 6px; margin-left: auto; overflow: hidden; }
+    .score-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 2px; transition: width 0.8s cubic-bezier(0.22,1,0.36,1); }
+    .error-box { display: none; background: rgba(224,92,92,0.08); border: 1px solid rgba(224,92,92,0.25); border-radius: 10px; padding: 14px 18px; font-size: 0.85rem; color: #f09090; margin-bottom: 20px; }
     .error-box.active { display: block; animation: fadeIn 0.2s; }
-
-    .divider {
-      height: 1px; background: var(--border); margin: 32px 0;
-    }
-
-    .empty-state {
-      text-align: center; padding: 60px 20px;
-      color: var(--muted);
-    }
+    .divider { height: 1px; background: var(--border); margin: 32px 0; }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
     .empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
     .empty-state p { font-size: 0.9rem; line-height: 1.6; }
-
-    .vinyl {
-      width: 36px; height: 36px;
-      border-radius: 50%;
-      background: conic-gradient(
-        #1a1a22 0deg 10deg,
-        #222230 10deg 20deg,
-        #1a1a22 20deg 30deg,
-        #222230 30deg 360deg
-      );
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-    }
-    .vinyl::after {
-      content: '';
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: var(--bg);
-      border: 2px solid rgba(255,255,255,0.05);
-    }
-    .song-card:hover .vinyl {
-      animation: rotate 2s linear infinite;
-    }
+    .vinyl { width: 36px; height: 36px; border-radius: 50%; background: conic-gradient(#1a1a22 0deg 10deg, #222230 10deg 20deg, #1a1a22 20deg 30deg, #222230 30deg 360deg); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .vinyl::after { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--bg); border: 2px solid rgba(255,255,255,0.05); }
+    .song-card:hover .vinyl { animation: rotate 2s linear infinite; }
     @keyframes rotate { to { transform: rotate(360deg); } }
-
-    .save-feedback {
-      font-size: 0.78rem;
-      color: var(--success);
-      font-family: 'DM Mono', monospace;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
+    .save-feedback { font-size: 0.78rem; color: var(--success); font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; }
     .save-feedback.show { opacity: 1; }
+
+    /* ── ONBOARDING MODAL ── */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); z-index: 500; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease; }
+    .modal-backdrop.hidden { display: none; }
+    .modal { background: var(--surface); border: 1px solid rgba(200,169,110,0.2); border-radius: 16px; padding: 36px 40px; max-width: 520px; width: 90%; box-shadow: 0 24px 80px rgba(0,0,0,0.6); }
+    .modal-title { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-style: italic; margin-bottom: 6px; }
+    .modal-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+    .modal .field { margin-bottom: 16px; }
+    .modal-skip { font-size: 0.75rem; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; display: block; text-align: center; margin-top: 12px; }
+    .modal-skip:hover { color: var(--text); }
+
+    /* ── METRICS ── */
+    .metrics-intro { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 28px; font-size: 0.85rem; line-height: 1.7; color: var(--muted); }
+    .metrics-intro strong { color: var(--text); }
+    .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
+    @media (max-width: 640px) { .metrics-grid { grid-template-columns: 1fr; } }
+    .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; transition: border-color 0.2s; }
+    .metric-card:hover { border-color: rgba(200,169,110,0.2); }
+    .metric-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+    .metric-name { font-weight: 600; font-size: 0.9rem; }
+    .metric-badge { font-family: 'DM Mono', monospace; font-size: 0.62rem; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.05em; }
+    .badge-retrieval { background: rgba(200,169,110,0.12); color: var(--accent); border: 1px solid rgba(200,169,110,0.2); }
+    .badge-generation { background: rgba(124,106,247,0.12); color: #a99ff5; border: 1px solid rgba(124,106,247,0.2); }
+    .metric-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
+    .metric-formula { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--accent2); background: rgba(124,106,247,0.06); border: 1px solid rgba(124,106,247,0.1); border-radius: 6px; padding: 8px 12px; line-height: 1.6; }
+    .metric-value-row { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .metric-value { font-family: 'DM Mono', monospace; font-size: 1.5rem; font-weight: 500; color: var(--accent); min-width: 60px; }
+    .metric-bar-wrap { flex: 1; }
+    .metric-bar-bg { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .metric-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 2px; transition: width 1s cubic-bezier(0.22,1,0.36,1); }
+    .metric-bar-label { font-size: 0.65rem; color: var(--muted); margin-top: 4px; font-family: 'DM Mono', monospace; }
+    .run-eval-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .eval-status { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); }
+    .results-table-wrap { overflow-x: auto; margin-top: 24px; }
+    .results-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .results-table th { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; }
+    .results-table td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .results-table tr.avg-row td { font-weight: 600; color: var(--accent); border-top: 1px solid var(--border); }
+    .results-table tr:not(.avg-row):hover td { background: var(--surface2); }
+    .pill-good { color: var(--success); }
+    .pill-mid  { color: var(--accent); }
+    .pill-low  { color: var(--muted); }
+    .gt-note { background: rgba(124,106,247,0.06); border: 1px solid rgba(124,106,247,0.15); border-radius: 8px; padding: 12px 16px; font-size: 0.78rem; color: var(--muted); line-height: 1.6; margin-top: 16px; }
+    .gt-note strong { color: #a99ff5; }
   </style>
 </head>
 <body>
   <div class="ambient ambient-1"></div>
   <div class="ambient ambient-2"></div>
 
-  <div class="app">
-    <header>
-      <div>
-        <div class="logo">Song<span>mind</span></div>
-        <div class="tagline">Song recommendations based on: Lyrics · Audio Features · Mood</div>
-       </div>
-      <div style="text-align:right">
-        <div class="tagline" id="api-status">TP2 de Temas Avanzados de Deep Learning</div>
-       </div>
-    </header>
-
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('recommend')">Recomendar</button>
-      <button class="tab" onclick="switchTab('profile')">Mi Perfil</button>
-    </div>
-
-    <div class="panel active" id="panel-recommend">
-
-      <div class="user-id-row">
-        <div class="field">
-          <label>User ID</label>
-          <input type="text" id="user-id" value="user_001" placeholder="user_001" />
-        </div>
-        <button class="btn btn-ghost" onclick="switchTab('profile')" style="margin-bottom:0; white-space:nowrap">
-          Editar perfil →
-        </button>
-      </div>
-
-      <div class="section-label">¿Qué estás buscando?</div>
-      <div class="prompt-wrap">
-        <textarea
-          class="prompt-area"
-          id="prompt-input"
-          placeholder="quiero canciones que vayan con mi mood feliz :)"
-          maxlength="2000"
-          oninput="updateCharCount()"
-        ></textarea>
-        <div class="prompt-footer">
-          <span class="char-count" id="char-count">0 / 2000</span>
-          <button class="btn btn-primary" id="recommend-btn" onclick="sendRecommend()">
-            <span>▶</span> Recomendar
-          </button>
-        </div>
-      </div>
-
-      <div class="error-box" id="error-box"></div>
-
-      <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <span class="loading-text" id="loading-text">Buscando canciones…</span>
-      </div>
-
-      <div class="results" id="results">
-        <div class="results-header">
-          <div class="results-title" id="results-title">Top picks</div>
-          <div class="results-meta" id="results-meta"></div>
-        </div>
-
-        <div class="mood-bar" id="mood-bar"></div>
-
-        <div class="song-list" id="song-list"></div>
-      </div>
-
-      <div id="empty-state" class="empty-state" style="display:none">
-        <div class="empty-icon">🎵</div>
-        <p>No se encontraron canciones que coincidan con tu búsqueda.<br>Probá con otros términos o ajustá tu perfil.</p>
-      </div>
-    </div>
-
-    <!-- PROFILE PANEL -->
-    <div class="panel" id="panel-profile">
-      <div class="section-label">Perfil de usuario</div>
-
-      <div class="field">
-        <label>User ID</label>
-        <input type="text" id="profile-user-id" value="user_001" onblur="loadProfile()" />
-        <div class="hint">Este ID se usará en el endpoint /recommend</div>
-      </div>
-
-      <div class="divider"></div>
+  <!-- ONBOARDING MODAL -->
+  <div class="modal-backdrop hidden" id="modal-backdrop">
+    <div class="modal">
+      <div class="modal-title">Bienvenido a <span style="color:var(--accent);font-style:italic">Songmind</span></div>
+      <div class="modal-sub">Completá tu perfil musical para obtener mejores recomendaciones. Podés modificarlo después desde <em>Mi Perfil</em>.</div>
 
       <div class="grid-2">
         <div class="field">
           <label>Géneros favoritos</label>
           <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
-            <div id="tags-fav-genres"></div>
-            <input class="mini-input" placeholder="rap, pop, jazz…" onkeydown="addTag(event, 'fav-genres')" />
+            <div id="m-tags-fav-genres"></div>
+            <input class="mini-input" placeholder="rap, jazz…" onkeydown="addModalTag(event,'fav-genres')" />
           </div>
-          <div class="hint">Presioná Enter para agregar</div>
+          <div class="hint">Enter para agregar</div>
         </div>
         <div class="field">
           <label>Géneros que no te gustan</label>
           <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
-            <div id="tags-dis-genres"></div>
-            <input class="mini-input" placeholder="metal, country…" onkeydown="addTag(event, 'dis-genres')" />
+            <div id="m-tags-dis-genres"></div>
+            <input class="mini-input" placeholder="metal…" onkeydown="addModalTag(event,'dis-genres')" />
           </div>
         </div>
         <div class="field">
           <label>Artistas favoritos</label>
           <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
-            <div id="tags-fav-artists"></div>
-            <input class="mini-input" placeholder="Nas, Sade…" onkeydown="addTag(event, 'fav-artists')" />
+            <div id="m-tags-fav-artists"></div>
+            <input class="mini-input" placeholder="Nas, Sade…" onkeydown="addModalTag(event,'fav-artists')" />
           </div>
         </div>
         <div class="field">
           <label>Artistas que no te gustan</label>
           <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
-            <div id="tags-dis-artists"></div>
-            <input class="mini-input" placeholder="…" onkeydown="addTag(event, 'dis-artists')" />
+            <div id="m-tags-dis-artists"></div>
+            <input class="mini-input" placeholder="…" onkeydown="addModalTag(event,'dis-artists')" />
           </div>
         </div>
       </div>
 
       <div class="field">
         <label>Idioma preferido</label>
-        <select id="pref-lang">
+        <select id="m-pref-lang">
           <option value="">Sin preferencia</option>
           <option value="en">Inglés (en)</option>
           <option value="es">Español (es)</option>
@@ -537,294 +202,516 @@
         </select>
       </div>
 
+      <button class="btn btn-primary btn-full" style="margin-top:20px" onclick="submitOnboarding()">Guardar y empezar</button>
+      <span class="modal-skip" onclick="skipOnboarding()">Saltar por ahora</span>
+      <div id="modal-error" style="display:none;margin-top:10px;font-size:0.75rem;color:var(--danger);font-family:'DM Mono',monospace;"></div>
+    </div>
+  </div>
+
+  <div class="app">
+    <header>
+      <div>
+        <div class="logo">Song<span>mind</span></div>
+        <div class="tagline">Song recommendations based on: Lyrics · Audio Features · Mood</div>
+      </div>
+      <div style="text-align:right">
+        <div class="tagline">TP2 de Temas Avanzados de Deep Learning</div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('recommend')">Recomendar</button>
+      <button class="tab" onclick="switchTab('profile')">Mi Perfil</button>
+      <button class="tab" onclick="switchTab('metrics')">Métricas</button>
+    </div>
+
+    <!-- RECOMMEND -->
+    <div class="panel active" id="panel-recommend">
+      <div class="section-label">¿Qué estás buscando?</div>
+      <div class="prompt-wrap">
+        <textarea class="prompt-area" id="prompt-input"
+          placeholder="quiero canciones que vayan con mi mood feliz :)"
+          maxlength="2000" oninput="updateCharCount()"></textarea>
+        <div class="prompt-footer">
+          <span class="char-count" id="char-count">0 / 2000</span>
+          <button class="btn btn-primary" id="recommend-btn" onclick="sendRecommend()">
+            <span>&#9654;</span> Recomendar
+          </button>
+        </div>
+      </div>
+
+      <div class="error-box" id="error-box"></div>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span class="loading-text" id="loading-text">Buscando canciones...</span>
+      </div>
+
+      <div class="results" id="results">
+        <div class="results-header">
+          <div class="results-title" id="results-title">Top picks</div>
+          <div class="results-meta" id="results-meta"></div>
+        </div>
+        <div class="mood-bar" id="mood-bar"></div>
+        <div class="song-list" id="song-list"></div>
+      </div>
+
+      <div id="empty-state" class="empty-state" style="display:none">
+        <div class="empty-icon">&#127925;</div>
+        <p>No se encontraron canciones que coincidan con tu busqueda.<br>Proba con otros terminos o ajusta tu perfil.</p>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="panel" id="panel-profile">
+      <div class="section-label">Perfil de usuario &middot; <span style="color:var(--accent);font-family:'DM Mono',monospace;font-size:0.65rem">user_001</span></div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label>Generos favoritos</label>
+          <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
+            <div id="tags-fav-genres"></div>
+            <input class="mini-input" placeholder="rap, pop, jazz..." onkeydown="addTag(event,'fav-genres')" />
+          </div>
+          <div class="hint">Presiona Enter para agregar</div>
+        </div>
+        <div class="field">
+          <label>Generos que no te gustan</label>
+          <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
+            <div id="tags-dis-genres"></div>
+            <input class="mini-input" placeholder="metal, country..." onkeydown="addTag(event,'dis-genres')" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Artistas favoritos</label>
+          <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
+            <div id="tags-fav-artists"></div>
+            <input class="mini-input" placeholder="Nas, Sade..." onkeydown="addTag(event,'fav-artists')" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Artistas que no te gustan</label>
+          <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
+            <div id="tags-dis-artists"></div>
+            <input class="mini-input" placeholder="..." onkeydown="addTag(event,'dis-artists')" />
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Idioma preferido</label>
+        <select id="pref-lang">
+          <option value="">Sin preferencia</option>
+          <option value="en">Ingles (en)</option>
+          <option value="es">Espanol (es)</option>
+          <option value="pt">Portugues (pt)</option>
+          <option value="fr">Frances (fr)</option>
+          <option value="de">Aleman (de)</option>
+          <option value="ja">Japones (ja)</option>
+          <option value="ko">Coreano (ko)</option>
+        </select>
+      </div>
+
       <div class="field">
         <label>Canciones favoritas</label>
         <div class="tag-container" onclick="this.querySelector('.mini-input').focus()">
           <div id="tags-fav-songs"></div>
-          <input class="mini-input" placeholder="Clint Eastwood, No Rain…" onkeydown="addTag(event, 'fav-songs')" />
+          <input class="mini-input" placeholder="Clint Eastwood, No Rain..." onkeydown="addTag(event,'fav-songs')" />
         </div>
       </div>
 
-      <div style="display:flex; gap:12px; align-items:center; margin-top:8px">
-        <button class="btn btn-primary" onclick="saveProfile()">Guardar perfil</button>
-        <span class="save-feedback" id="save-feedback">✓ Guardado</span>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+        <button class="btn btn-primary" onclick="saveProfile()">Guardar cambios</button>
+        <span class="save-feedback" id="save-feedback"></span>
+      </div>
+      <div class="divider"></div>
+    </div>
+
+    <!-- METRICS -->
+    <div class="panel" id="panel-metrics">
+
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-card-header">
+            <div class="metric-name">Context Precision@K</div>
+            <div class="metric-badge badge-retrieval">Retrieval</div>
+          </div>
+          <div class="metric-desc">Las canciones relevantes aparecen primero? Penaliza que los mejores matches aparezcan al final.</div>
+          <div class="metric-formula">CP@K = sum(Precision@k x vk) / relevant_in_top_k<br>vk=1 si la cancion en rank k esta en GT</div>
+          <div class="metric-value-row">
+            <div class="metric-value" id="val-cp">--</div>
+            <div class="metric-bar-wrap">
+              <div class="metric-bar-bg"><div class="metric-bar-fill" id="bar-cp" style="width:0%"></div></div>
+              <div class="metric-bar-label">0 = peor &middot; 1 = mejor</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-card-header">
+            <div class="metric-name">Recall@K</div>
+            <div class="metric-badge badge-retrieval">Retrieval</div>
+          </div>
+          <div class="metric-desc">Cuantas canciones relevantes aparecen en el top K? Capea el denominador en K para evitar scores ~0 con GT grandes.</div>
+          <div class="metric-formula">Recall@K = |top_K intersect GT| / min(K, |GT|)</div>
+          <div class="metric-value-row">
+            <div class="metric-value" id="val-rec">--</div>
+            <div class="metric-bar-wrap">
+              <div class="metric-bar-bg"><div class="metric-bar-fill" id="bar-rec" style="width:0%"></div></div>
+              <div class="metric-bar-label">0 = peor &middot; 1 = mejor</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-card-header">
+            <div class="metric-name">Faithfulness</div>
+            <div class="metric-badge badge-generation">Generation</div>
+          </div>
+          <div class="metric-desc">Las explicaciones del LLM estan respaldadas por los lyrics recuperados? Un juez GPT-4o-mini verifica cada claim.</div>
+          <div class="metric-formula">Faith = |explicaciones soportadas| / |total recomendaciones|</div>
+          <div class="metric-value-row">
+            <div class="metric-value" id="val-faith">--</div>
+            <div class="metric-bar-wrap">
+              <div class="metric-bar-bg"><div class="metric-bar-fill" id="bar-faith" style="width:0%"></div></div>
+              <div class="metric-bar-label">0 = peor &middot; 1 = mejor</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <div class="metric-card-header">
+            <div class="metric-name">Answer Relevance</div>
+            <div class="metric-badge badge-generation">Generation</div>
+          </div>
+          <div class="metric-desc">La respuesta aborda lo que el usuario pidio? GPT genera 3 preguntas reversas y mide coseno con el prompt original.</div>
+          <div class="metric-formula">AR = (1/N) sum cos(embed(question_i), embed(prompt))</div>
+          <div class="metric-value-row">
+            <div class="metric-value" id="val-ar">--</div>
+            <div class="metric-bar-wrap">
+              <div class="metric-bar-bg"><div class="metric-bar-fill" id="bar-ar" style="width:0%"></div></div>
+              <div class="metric-bar-label">0 = peor &middot; 1 = mejor</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="divider"></div>
-      <div class="hint">Derechos reservados.</div>
+      <div class="section-label">Cargar resultados</div>
+      <div class="run-eval-row">
+        <button class="btn btn-primary" onclick="loadEvalResults()">Cargar evaluation_results.json</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('eval-file').click()">Subir archivo</button>
+        <input type="file" id="eval-file" accept=".json" style="display:none" onchange="loadEvalFile(event)" />
+        <span class="eval-status" id="eval-status"></span>
+      </div>
+      <!--  <div class="hint">Primero corra <code style="color:var(--accent2)">python scripts/run_evaluation.py</code> para generar <code style="color:var(--accent2)">data/evaluation_results.json</code>.</div> -->
+
+      <div id="eval-table-wrap" style="display:none">
+        <div class="results-table-wrap">
+          <table class="results-table" id="eval-table">
+            <thead>
+              <tr><th>Categoria</th><th>CP@K</th><th>Recall@K</th><th>Faithfulness</th><th>Answer Rel.</th></tr>
+            </thead>
+            <tbody id="eval-tbody"></tbody>
+          </table>
+        </div>
+        <div class="gt-note">
+          <strong>Ground truth:</strong> construido desde MongoDB con audio features de Spotify.
+          Happy: valence &gt; 0.7 &middot; Sad: valence &lt; 0.3 &middot; Energetic: energy &gt; 0.8 &middot;
+          Calm: energy &lt; 0.3 &middot; Danceable: danceability &gt; 0.7 &middot;
+          Acoustic: acousticness &gt; 0.7 &middot; Instrumental: instrumentalness &gt; 0.5
+        </div>
+      </div>
+
     </div>
   </div>
 
   <script>
     const API_BASE = 'http://localhost:8000';
+    const FIXED_USER = 'user_001';
 
-    let userProfile = {
-      user_id: 'user_001',
-      favourite_genres: ['rap', 'soul'],
-      favourite_artists: ['Nas', 'Sade'],
-      favourite_songs: [],
-      preferred_language: '',
-      disliked_genres: [],
-      disliked_artists: [],
-      listening_history: []
-    };
+    const tagStore = { 'fav-genres':[], 'dis-genres':[], 'fav-artists':[], 'dis-artists':[], 'fav-songs':[] };
+    const modalTagStore = { 'fav-genres':[], 'dis-genres':[], 'fav-artists':[], 'dis-artists':[] };
 
-    const tagStore = {
-      'fav-genres': [],
-      'dis-genres': [],
-      'fav-artists': [],
-      'dis-artists': [],
-      'fav-songs': []
-    };
-
-    function initProfile() {
-      tagStore['fav-genres'] = [...userProfile.favourite_genres];
-      tagStore['dis-genres'] = [...userProfile.disliked_genres];
-      tagStore['fav-artists'] = [...userProfile.favourite_artists];
-      tagStore['dis-artists'] = [...userProfile.disliked_artists];
-      tagStore['fav-songs'] = [...userProfile.favourite_songs];
-      document.getElementById('profile-user-id').value = userProfile.user_id;
-      document.getElementById('pref-lang').value = userProfile.preferred_language || '';
-      Object.keys(tagStore).forEach(renderTags);
+    // ── Onboarding ──
+    async function checkOnboarding() {
+      try {
+        const res = await fetch(`${API_BASE}/users/${FIXED_USER}`);
+        if (res.ok) {
+          const data = await res.json();
+          tagStore['fav-genres']  = data.favourite_genres  || [];
+          tagStore['dis-genres']  = data.disliked_genres   || [];
+          tagStore['fav-artists'] = data.favourite_artists || [];
+          tagStore['dis-artists'] = data.disliked_artists  || [];
+          tagStore['fav-songs']   = data.favourite_songs   || [];
+          document.getElementById('pref-lang').value = data.preferred_language || '';
+          Object.keys(tagStore).forEach(renderTags);
+          return;
+        }
+      } catch (_) {}
+      document.getElementById('modal-backdrop').classList.remove('hidden');
     }
 
+    function renderModalTags(key) {
+      const c = document.getElementById('m-tags-' + key);
+      c.innerHTML = '';
+      modalTagStore[key].forEach((val, i) => {
+        const t = document.createElement('span');
+        t.className = 'tag';
+        t.innerHTML = escHtml(val) + ' <span class="remove" onclick="removeModalTag(\'' + key + '\',' + i + ')">x</span>';
+        c.appendChild(t);
+      });
+    }
+    function addModalTag(e, key) {
+      if (e.key !== 'Enter' && e.key !== ',') return;
+      e.preventDefault();
+      const val = e.target.value.trim().replace(/,$/, '');
+      if (val && !modalTagStore[key].includes(val)) { modalTagStore[key].push(val); renderModalTags(key); }
+      e.target.value = '';
+    }
+    function removeModalTag(key, idx) { modalTagStore[key].splice(idx, 1); renderModalTags(key); }
+
+    async function submitOnboarding() {
+      const profile = {
+        user_id: FIXED_USER,
+        favourite_genres:  [...modalTagStore['fav-genres']],
+        disliked_genres:   [...modalTagStore['dis-genres']],
+        favourite_artists: [...modalTagStore['fav-artists']],
+        disliked_artists:  [...modalTagStore['dis-artists']],
+        favourite_songs:   [],
+        preferred_language: document.getElementById('m-pref-lang').value,
+        listening_history: []
+      };
+      try {
+        const res = await fetch(`${API_BASE}/users/${FIXED_USER}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profile)
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        tagStore['fav-genres']  = [...profile.favourite_genres];
+        tagStore['dis-genres']  = [...profile.disliked_genres];
+        tagStore['fav-artists'] = [...profile.favourite_artists];
+        tagStore['dis-artists'] = [...profile.disliked_artists];
+        document.getElementById('pref-lang').value = profile.preferred_language;
+        Object.keys(tagStore).forEach(renderTags);
+        document.getElementById('modal-backdrop').classList.add('hidden');
+      } catch (err) {
+        const el = document.getElementById('modal-error');
+        el.textContent = 'Error guardando: ' + err.message;
+        el.style.display = 'block';
+      }
+    }
+    function skipOnboarding() { document.getElementById('modal-backdrop').classList.add('hidden'); }
+
+    // ── Profile panel ──
     function renderTags(key) {
-      const container = document.getElementById('tags-' + key);
-      container.innerHTML = '';
+      const c = document.getElementById('tags-' + key);
+      if (!c) return;
+      c.innerHTML = '';
       tagStore[key].forEach((val, i) => {
         const t = document.createElement('span');
         t.className = 'tag';
-        t.innerHTML = `${val} <span class="remove" onclick="removeTag('${key}',${i})">×</span>`;
-        container.appendChild(t);
+        t.innerHTML = escHtml(val) + ' <span class="remove" onclick="removeTag(\'' + key + '\',' + i + ')">x</span>';
+        c.appendChild(t);
       });
     }
-
     function addTag(e, key) {
       if (e.key !== 'Enter' && e.key !== ',') return;
       e.preventDefault();
       const val = e.target.value.trim().replace(/,$/, '');
-      if (val && !tagStore[key].includes(val)) {
-        tagStore[key].push(val);
-        renderTags(key);
-      }
+      if (val && !tagStore[key].includes(val)) { tagStore[key].push(val); renderTags(key); }
       e.target.value = '';
     }
-
-    function removeTag(key, idx) {
-      tagStore[key].splice(idx, 1);
-      renderTags(key);
-    }
-
-    async function loadProfile() {
-      const uid = document.getElementById('profile-user-id').value.trim();
-      if (!uid) return;
-      try {
-        const res = await fetch(`${API_BASE}/users/${uid}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        tagStore['fav-genres']  = data.favourite_genres || [];
-        tagStore['dis-genres']  = data.disliked_genres || [];
-        tagStore['fav-artists'] = data.favourite_artists || [];
-        tagStore['dis-artists'] = data.disliked_artists || [];
-        tagStore['fav-songs']   = data.favourite_songs || [];
-        document.getElementById('pref-lang').value = data.preferred_language || '';
-        Object.keys(tagStore).forEach(renderTags);
-      } catch (_) {}
-    }
+    function removeTag(key, idx) { tagStore[key].splice(idx, 1); renderTags(key); }
 
     async function saveProfile() {
-      userProfile.user_id = document.getElementById('profile-user-id').value.trim() || 'user_001';
-      userProfile.favourite_genres  = [...tagStore['fav-genres']];
-      userProfile.disliked_genres   = [...tagStore['dis-genres']];
-      userProfile.favourite_artists = [...tagStore['fav-artists']];
-      userProfile.disliked_artists  = [...tagStore['dis-artists']];
-      userProfile.favourite_songs   = [...tagStore['fav-songs']];
-      userProfile.preferred_language = document.getElementById('pref-lang').value;
-      document.getElementById('user-id').value = userProfile.user_id;
-
+      const profile = {
+        user_id: FIXED_USER,
+        favourite_genres:  [...tagStore['fav-genres']],
+        disliked_genres:   [...tagStore['dis-genres']],
+        favourite_artists: [...tagStore['fav-artists']],
+        disliked_artists:  [...tagStore['dis-artists']],
+        favourite_songs:   [...tagStore['fav-songs']],
+        preferred_language: document.getElementById('pref-lang').value,
+        listening_history: []
+      };
       const fb = document.getElementById('save-feedback');
       try {
-        const res = await fetch(`${API_BASE}/users/${userProfile.user_id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(userProfile),
+        const res = await fetch(`${API_BASE}/users/${FIXED_USER}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profile)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        fb.textContent = '✓ Cambios guardados';
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        fb.textContent = 'Guardado en Mongo';
         fb.style.color = '';
         fb.classList.add('show');
         setTimeout(() => fb.classList.remove('show'), 2500);
       } catch (err) {
-        fb.textContent = `✗ Error: ${err.message}`;
+        fb.textContent = 'Error: ' + err.message;
         fb.style.color = 'var(--danger)';
         fb.classList.add('show');
         setTimeout(() => { fb.classList.remove('show'); fb.style.color = ''; }, 3000);
       }
     }
 
+    // ── Tabs ──
     function switchTab(name) {
-      document.querySelectorAll('.tab').forEach((t, i) => {
-        t.classList.toggle('active', (i === 0 && name === 'recommend') || (i === 1 && name === 'profile'));
+      ['recommend','profile','metrics'].forEach((n, i) => {
+        document.querySelectorAll('.tab')[i].classList.toggle('active', n === name);
       });
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       document.getElementById('panel-' + name).classList.add('active');
     }
 
+    // ── Recommend ──
     function updateCharCount() {
-      const v = document.getElementById('prompt-input').value.length;
-      document.getElementById('char-count').textContent = `${v} / 2000`;
+      document.getElementById('char-count').textContent = document.getElementById('prompt-input').value.length + ' / 2000';
     }
 
-    const loadingMessages = [
-      'Parseando tu mood…',
-      'Embebiendo la query…',
-      'Consultando Pinecone…',
-      'Agregando candidatos…',
-      'Rerankeando con audio features…',
-      'Seleccionando top canciones…'
-    ];
-
+    const loadingMessages = ['Parseando tu mood...','Embebiendo la query...','Consultando Pinecone...','Agregando candidatos...','Rerankeando con audio features...','Seleccionando top canciones...'];
     let loadingInterval;
     function startLoading() {
       let i = 0;
       const el = document.getElementById('loading-text');
       el.textContent = loadingMessages[0];
-      loadingInterval = setInterval(() => {
-        i = (i + 1) % loadingMessages.length;
-        el.textContent = loadingMessages[i];
-      }, 1400);
+      loadingInterval = setInterval(() => { i = (i+1) % loadingMessages.length; el.textContent = loadingMessages[i]; }, 1400);
     }
     function stopLoading() { clearInterval(loadingInterval); }
 
     async function sendRecommend() {
-      const userId = document.getElementById('user-id').value.trim();
       const prompt = document.getElementById('prompt-input').value.trim();
-
-      if (!userId || !prompt) {
-        showError('Completá el User ID y el prompt antes de continuar.');
-        return;
-      }
-
+      if (!prompt) { showError('Escribi tu busqueda antes de continuar.'); return; }
       hideError();
       setLoading(true);
       document.getElementById('results').classList.remove('active');
       document.getElementById('empty-state').style.display = 'none';
-
       try {
-        const res = await fetch(`${API_BASE}/recommend`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ user_id: userId, raw_prompt: prompt })
+        const res = await fetch(API_BASE + '/recommend', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: FIXED_USER, raw_prompt: prompt })
         });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.detail || `HTTP ${res.status}`);
-        }
-
-        const data = await res.json();
-        renderResults(data);
+        if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || 'HTTP ' + res.status); }
+        renderResults(await res.json());
       } catch (err) {
-        showError(`Error: ${err.message}. Verificá que el API esté corriendo en ${API_BASE}.`);
-      } finally {
-        setLoading(false);
-      }
+        showError('Error: ' + err.message + '. Verifica que el API este corriendo en ' + API_BASE);
+      } finally { setLoading(false); }
     }
 
     function renderResults(data) {
       const recs = data.recommendations || [];
-
-      if (recs.length === 0) {
-        document.getElementById('empty-state').style.display = 'block';
-        return;
-      }
-
-      document.getElementById('results-title').textContent = data.message === 'Top picks (response LLM disabled).'
-        ? 'Top picks para vos'
-        : data.message;
-      document.getElementById('results-meta').textContent = `${recs.length} canciones · ordenadas por score`;
+      if (!recs.length) { document.getElementById('empty-state').style.display = 'block'; return; }
+      document.getElementById('results-title').textContent =
+        data.message === 'Top picks (response LLM disabled).' ? 'Top picks para vos' : data.message;
+      document.getElementById('results-meta').textContent = recs.length + ' canciones - ordenadas por score';
 
       const moodBar = document.getElementById('mood-bar');
       moodBar.innerHTML = '';
-      const moods = recs[0]?.matched_mood || [];
-      const audioFeats = recs[0]?.matched_audio_features || [];
-      moods.forEach(m => {
-        const c = document.createElement('span');
-        c.className = 'mood-chip mood';
-        c.textContent = m;
-        moodBar.appendChild(c);
+      (recs[0].matched_mood || []).forEach(m => {
+        const c = document.createElement('span'); c.className = 'mood-chip mood'; c.textContent = m; moodBar.appendChild(c);
       });
-      audioFeats.forEach(a => {
-        const c = document.createElement('span');
-        c.className = 'mood-chip audio';
-        c.textContent = a;
-        moodBar.appendChild(c);
+      (recs[0].matched_audio_features || []).forEach(a => {
+        const c = document.createElement('span'); c.className = 'mood-chip audio'; c.textContent = a; moodBar.appendChild(c);
       });
 
       const list = document.getElementById('song-list');
       list.innerHTML = '';
       const maxScore = Math.max(...recs.map(r => r.score_total || 0));
-
       recs.forEach((song, idx) => {
         const card = document.createElement('div');
         card.className = 'song-card';
-        card.style.animationDelay = `${idx * 0.05}s`;
-
+        card.style.animationDelay = (idx * 0.05) + 's';
         const score = song.score_total || 0;
-        const scorePct = maxScore > 0 ? (score / maxScore * 100).toFixed(0) : 0;
-        const scoreDisp = (score * 100).toFixed(1);
-
-        card.innerHTML = `
-          <div class="vinyl"></div>
-          <div class="song-info">
-            <div class="song-title">${escHtml(song.track_name)}</div>
-            <div class="song-artist">${escHtml(song.artist_name)}</div>
-            ${song.explanation ? `<div class="hint" style="margin-top:6px">${escHtml(song.explanation)}</div>` : ''}
-          </div>
-          <div class="score-col">
-            <div class="score-val">${scoreDisp}</div>
-            <div class="score-bar"><div class="score-fill" style="width:0%" data-width="${scorePct}%"></div></div>
-          </div>
-        `;
+        const pct = maxScore > 0 ? (score / maxScore * 100).toFixed(0) : 0;
+        card.innerHTML =
+          '<div class="vinyl"></div>' +
+          '<div class="song-info">' +
+            '<div class="song-title">' + escHtml(song.track_name) + '</div>' +
+            '<div class="song-artist">' + escHtml(song.artist_name) + '</div>' +
+            (song.explanation ? '<div class="hint" style="margin-top:6px">' + escHtml(song.explanation) + '</div>' : '') +
+          '</div>' +
+          '<div class="score-col">' +
+            '<div class="score-val">' + (score*100).toFixed(1) + '</div>' +
+            '<div class="score-bar"><div class="score-fill" style="width:0%" data-width="' + pct + '%"></div></div>' +
+          '</div>';
         list.appendChild(card);
       });
-
       document.getElementById('results').classList.add('active');
-
-      setTimeout(() => {
-        document.querySelectorAll('.score-fill').forEach(el => {
-          el.style.width = el.dataset.width;
-        });
-      }, 100);
+      setTimeout(() => document.querySelectorAll('.score-fill').forEach(el => { el.style.width = el.dataset.width; }), 100);
     }
 
     function setLoading(on) {
-      const btn = document.getElementById('recommend-btn');
-      const loading = document.getElementById('loading');
-      btn.disabled = on;
-      if (on) {
-        loading.classList.add('active');
-        startLoading();
-      } else {
-        loading.classList.remove('active');
-        stopLoading();
+      document.getElementById('recommend-btn').disabled = on;
+      document.getElementById('loading').classList.toggle('active', on);
+      on ? startLoading() : stopLoading();
+    }
+    function showError(msg) { const el = document.getElementById('error-box'); el.textContent = msg; el.classList.add('active'); }
+    function hideError() { document.getElementById('error-box').classList.remove('active'); }
+
+    // ── Metrics ──
+    async function loadEvalResults() {
+      document.getElementById('eval-status').textContent = 'Cargando...';
+      try {
+        const res = await fetch('/data/evaluation_results.json');
+        if (!res.ok) throw new Error('HTTP ' + res.status + ' - corra run_evaluation.py primero');
+        renderEvalResults(await res.json());
+        document.getElementById('eval-status').textContent = 'Cargado';
+      } catch (err) {
+        document.getElementById('eval-status').textContent = 'Error: ' + err.message;
       }
     }
 
-    function showError(msg) {
-      const el = document.getElementById('error-box');
-      el.textContent = msg;
-      el.classList.add('active');
-    }
-    function hideError() {
-      document.getElementById('error-box').classList.remove('active');
-    }
-
-    function escHtml(s) {
-      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    function loadEvalFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try { renderEvalResults(JSON.parse(e.target.result)); document.getElementById('eval-status').textContent = file.name; }
+        catch (_) { document.getElementById('eval-status').textContent = 'JSON invalido'; }
+      };
+      reader.readAsText(file);
     }
 
-    initProfile();
+    function renderEvalResults(data) {
+      const rows = Array.isArray(data) ? data : (data.results || []);
+      if (!rows.length) { document.getElementById('eval-status').textContent = 'Sin datos'; return; }
+
+      const avgOf = k => rows.reduce((s,r) => s + (r[k] || 0), 0) / rows.length;
+      const avg = { cp: avgOf('cp_at_k'), rec: avgOf('recall_at_k'), faith: avgOf('faithfulness'), ar: avgOf('answer_relevance') };
+      const fmt = v => isNaN(v) ? '--' : v.toFixed(3);
+
+      document.getElementById('val-cp').textContent    = fmt(avg.cp);
+      document.getElementById('val-rec').textContent   = fmt(avg.rec);
+      document.getElementById('val-faith').textContent = fmt(avg.faith);
+      document.getElementById('val-ar').textContent    = fmt(avg.ar);
+      setTimeout(() => {
+        document.getElementById('bar-cp').style.width    = (avg.cp    * 100).toFixed(0) + '%';
+        document.getElementById('bar-rec').style.width   = (avg.rec   * 100).toFixed(0) + '%';
+        document.getElementById('bar-faith').style.width = (avg.faith * 100).toFixed(0) + '%';
+        document.getElementById('bar-ar').style.width    = (avg.ar    * 100).toFixed(0) + '%';
+      }, 100);
+
+      const tbody = document.getElementById('eval-tbody');
+      tbody.innerHTML = '';
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td>' + escHtml(r.label || '--') + '</td>' +
+          '<td class="' + cc(r.cp_at_k) + '">' + fmt(r.cp_at_k) + '</td>' +
+          '<td class="' + cc(r.recall_at_k) + '">' + fmt(r.recall_at_k) + '</td>' +
+          '<td class="' + cc(r.faithfulness) + '">' + fmt(r.faithfulness) + '</td>' +
+          '<td class="' + cc(r.answer_relevance) + '">' + fmt(r.answer_relevance) + '</td>';
+        tbody.appendChild(tr);
+      });
+      const avgTr = document.createElement('tr');
+      avgTr.className = 'avg-row';
+      avgTr.innerHTML = '<td>PROMEDIO</td><td>' + fmt(avg.cp) + '</td><td>' + fmt(avg.rec) + '</td><td>' + fmt(avg.faith) + '</td><td>' + fmt(avg.ar) + '</td>';
+      tbody.appendChild(avgTr);
+      document.getElementById('eval-table-wrap').style.display = 'block';
+    }
+
+    function cc(v) { if (!v && v !== 0) return ''; return v >= 0.75 ? 'pill-good' : v >= 0.5 ? 'pill-mid' : 'pill-low'; }
+    function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    checkOnboarding();
   </script>
 </body>
 </html>
