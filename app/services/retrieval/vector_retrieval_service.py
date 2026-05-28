@@ -7,7 +7,7 @@ from app.models.raw_pinecone_match import RawPineconeMatch
 from app.persistence.vector.pinecone_repository import PineconeRepository
 
 # Tunables for vector retrieval
-OVERFETCH_MULTIPLIER = 3                       # Alternative: fixed 500 — simpler but ignores per-request top_k.
+OVERFETCH_MULTIPLIER = 10                       # Alternative: fixed 500 — simpler but ignores per-request top_k.
 TEMPO_NORMALIZATION_DIVISOR = 250.0             # BPM ceiling used to map tempo into [0, 1]
 DEFAULT_RELEASE_YEAR_FALLBACK = 1900             # used only when release_date is missing/malformed AND no filter excludes it
 
@@ -77,11 +77,17 @@ class VectorRetrievalService:
     @staticmethod
     def _passes_filters(meta: dict, chars: dict, filters: MetadataFilters) -> bool:
         genres = meta.get("genres") or []
+        artist = (meta.get("artist_name") or "").lower()
+        track  = (meta.get("track_name")  or "").lower()
         if filters.genres_in and not (set(genres) & set(filters.genres_in)):
             return False
         if filters.genres_not_in and (set(genres) & set(filters.genres_not_in)):
             return False
-        if filters.artist_not_in and meta.get("artist_name") in filters.artist_not_in:
+        if filters.artist_in and artist not in {a.lower() for a in filters.artist_in}:
+            return False
+        if filters.artist_not_in and artist in {a.lower() for a in filters.artist_not_in}:
+            return False
+        if filters.songs_not_in and track in {s.lower() for s in filters.songs_not_in}:
             return False
         if filters.preferred_language and chars.get("language") != filters.preferred_language:
             return False

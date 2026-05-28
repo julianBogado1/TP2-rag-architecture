@@ -125,3 +125,53 @@ def test_incomplete_audio_kept_without_audio():
     result = svc.retrieve(_request(), [1.0, 0.0, 0.0])
     assert len(result) == 1
     assert result[0].metadata.audio_features is None
+
+
+def _meta_named(song_id, artist_name, track_name="t", genres=("pop",)):
+    m = _meta(song_id, genres=genres)
+    m["artist_name"] = artist_name
+    m["track_name"] = track_name
+    return m
+
+
+def test_filters_artist_in_keeps_only_matching():
+    fake_repo = FakePineconeRepository()
+    fake_repo.upsert_batch([
+        ("1_0", [1.0, 0.0, 0.0], _meta_named(1, "Taylor Swift")),
+        ("2_0", [1.0, 0.0, 0.0], _meta_named(2, "Metallica")),
+    ])
+    svc = VectorRetrievalService(fake_repo)
+    result = svc.retrieve(_request(filters=MetadataFilters(artist_in=["Taylor Swift"])), [1.0, 0.0, 0.0])
+    assert [c.song_id for c in result] == ["1"]
+
+
+def test_filters_artist_in_is_case_insensitive():
+    fake_repo = FakePineconeRepository()
+    fake_repo.upsert_batch([
+        ("1_0", [1.0, 0.0, 0.0], _meta_named(1, "Taylor Swift")),
+    ])
+    svc = VectorRetrievalService(fake_repo)
+    result = svc.retrieve(_request(filters=MetadataFilters(artist_in=["taylor swift"])), [1.0, 0.0, 0.0])
+    assert [c.song_id for c in result] == ["1"]
+
+
+def test_filters_artist_not_in_is_case_insensitive():
+    fake_repo = FakePineconeRepository()
+    fake_repo.upsert_batch([
+        ("1_0", [1.0, 0.0, 0.0], _meta_named(1, "Taylor Swift")),
+        ("2_0", [1.0, 0.0, 0.0], _meta_named(2, "Metallica")),
+    ])
+    svc = VectorRetrievalService(fake_repo)
+    result = svc.retrieve(_request(filters=MetadataFilters(artist_not_in=["TAYLOR SWIFT"])), [1.0, 0.0, 0.0])
+    assert [c.song_id for c in result] == ["2"]
+
+
+def test_filters_songs_not_in_excludes_by_track_name():
+    fake_repo = FakePineconeRepository()
+    fake_repo.upsert_batch([
+        ("1_0", [1.0, 0.0, 0.0], _meta_named(1, "A", track_name="Friday")),
+        ("2_0", [1.0, 0.0, 0.0], _meta_named(2, "B", track_name="Monday")),
+    ])
+    svc = VectorRetrievalService(fake_repo)
+    result = svc.retrieve(_request(filters=MetadataFilters(songs_not_in=["friday"])), [1.0, 0.0, 0.0])
+    assert [c.song_id for c in result] == ["2"]

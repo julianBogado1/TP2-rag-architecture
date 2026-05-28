@@ -23,7 +23,9 @@ def sample_prompt_score(sample_prompt_audio_features) -> PromptScore:
         wants_recent_songs=0.30, wants_popular_songs=0.40, wants_obscure_songs=0.0,
         wants_lyrics_focus=0.30, wants_mood_focus=0.75,
         semantic_query="happy upbeat songs with positive mood",
-        extracted_genres=None, extracted_artists=None, preferred_language="es",
+        wanted_genres=None, wanted_artists=None,
+        unwanted_genres=None, unwanted_artists=None, unwanted_songs=None,
+        preferred_language="es",
         audio_features=sample_prompt_audio_features,
     )
 

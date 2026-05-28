@@ -7,7 +7,9 @@ from app.models.user_profile import UserProfileData
 class MetadataFilters(BaseModel):
     genres_in: list[str] | None = None
     genres_not_in: list[str] | None = None
+    artist_in: list[str] | None = None
     artist_not_in: list[str] | None = None
+    songs_not_in: list[str] | None = None
     preferred_language: str | None = None
     min_popularity: int | None = None
     release_date_min: date | None = None
@@ -28,7 +30,7 @@ class SongRecommendationRequest(BaseModel):
     prompt_score: PromptScore
     user_profile: UserProfileData
     semantic_query: str
-    target_audio_features: PromptAudioFeatures
+    target_audio_features: PromptAudioFeatures | None = None
     metadata_filters: MetadataFilters
     ranking_weights: RankingWeights
     top_k_retrieval: int = Field(default=50, gt=0)

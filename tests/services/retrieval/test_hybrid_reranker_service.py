@@ -114,3 +114,31 @@ def test_no_audio_renormalizes_remaining_weights():
     # lyrics contribution is scaled up by 1/(1 - w_audio) so the song isn't
     # penalized for missing audio (would be 0.55*0.8 = 0.44 without renormalization).
     assert r.score_breakdown.score_lyrics > 0.55 * 0.8
+
+
+# --- Prompt-target nullability -------------------------------------------
+
+
+def test_null_target_audio_drops_audio_axis():
+    # All six prompt axes None → treat like a lyrics-only request.
+    svc = HybridRerankerService()
+    audio = PromptAudioFeatures()  # all axes default to None
+    r = svc.rerank([_candidate()], _request(audio=audio))[0]
+    assert r.score_breakdown.score_audio == 0.0
+
+
+def test_partial_target_audio_scores_only_present_axes():
+    # Only valence is set; the similarity must still compute (single-axis cosine == 1.0)
+    # and not crash on the None axes.
+    svc = HybridRerankerService()
+    audio = PromptAudioFeatures(valence=0.85)
+    r = svc.rerank([_candidate(valence=0.85)], _request(audio=audio))[0]
+    assert r.score_breakdown.score_audio > 0
+
+
+def test_target_with_some_nulls_does_not_raise():
+    svc = HybridRerankerService()
+    audio = PromptAudioFeatures(valence=0.5, energy=None, danceability=0.5,
+                                 acousticness=None, instrumentalness=None, tempo_norm=0.5)
+    # Just exercising the code path — must not raise on None axes.
+    svc.rerank([_candidate()], _request(audio=audio))

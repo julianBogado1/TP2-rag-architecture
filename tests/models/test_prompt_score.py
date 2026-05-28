@@ -1,5 +1,6 @@
 import pytest
 from app.models.prompt_score import PromptScore, PromptAudioFeatures
+from app.models.genre import Genre
 
 
 def _audio():
@@ -44,3 +45,32 @@ def test_preferred_language_normalises_valid_iso(raw, expected):
 def test_preferred_language_invalid_format_becomes_none(bad):
     score = PromptScore(**_base_kwargs(preferred_language=bad))
     assert score.preferred_language is None
+
+
+# --- Genre vocabulary filtering -------------------------------------------
+
+
+def test_known_genres_kept_and_typed_as_enum():
+    score = PromptScore(**_base_kwargs(wanted_genres=["pop", "rap"]))
+    assert score.wanted_genres == [Genre.POP, Genre.RAP]
+
+
+def test_unknown_genres_silently_dropped():
+    # "hip-hop" and "jazz" aren't in the canonical vocabulary.
+    score = PromptScore(**_base_kwargs(wanted_genres=["hip-hop", "rap", "jazz"]))
+    assert score.wanted_genres == [Genre.RAP]
+
+
+def test_all_unknown_genres_collapse_to_none():
+    score = PromptScore(**_base_kwargs(unwanted_genres=["hip-hop", "jazz"]))
+    assert score.unwanted_genres is None
+
+
+def test_genre_case_and_whitespace_normalized():
+    score = PromptScore(**_base_kwargs(wanted_genres=["  POP  ", "Rock"]))
+    assert score.wanted_genres == [Genre.POP, Genre.ROCK]
+
+
+def test_genre_list_none_passes_through():
+    score = PromptScore(**_base_kwargs(wanted_genres=None))
+    assert score.wanted_genres is None

@@ -1,4 +1,3 @@
-from datetime import date, timedelta
 from app.core.config import Settings
 from app.models.request_context import RequestContext
 from app.models.prompt_score import PromptScore
@@ -7,16 +6,12 @@ from app.models.song_recommendation_request import (
     SongRecommendationRequest, MetadataFilters, RankingWeights,
 )
 
-# Activation thresholds for prompt-score-driven branches
-WANTS_POPULAR_THRESHOLD       = 0.6
+# Activation thresholds for prompt-score-driven ranker weight overrides.
+# Filters are NOT score-gated: per the explicit-only principle, they are populated
+# solely from explicit prompt mentions (wanted_/unwanted_) and the user profile.
 WANTS_OBSCURE_THRESHOLD       = 0.6
-WANTS_RECENT_THRESHOLD        = 0.6
 WANTS_LYRICS_FOCUS_THRESHOLD  = 0.7
 WANTS_MOOD_FOCUS_THRESHOLD    = 0.7
-
-# Filter values applied when an activation threshold fires
-MIN_POPULARITY_WHEN_POPULAR   = 30
-RECENT_WINDOW_DAYS            = 365 * 5
 
 # Preset weights when a focus mode kicks in (override defaults)
 LYRICS_FOCUS_W_LYRICS = 0.70
@@ -52,14 +47,21 @@ class RecommendationRequestBuilder:
         )
 
     def _build_filters(self, score: PromptScore, profile: UserProfileData) -> MetadataFilters:
-        today = date.today()
+        # Unwanted wins over wanted on the same value (LLM-emit conflict).
+        unwanted_genres  = set(score.unwanted_genres  or [])
+        unwanted_artists = set(score.unwanted_artists or [])
+        wanted_genres    = [g for g in (score.wanted_genres  or []) if g not in unwanted_genres]
+        wanted_artists   = [a for a in (score.wanted_artists or []) if a not in unwanted_artists]
         return MetadataFilters(
-            genres_in          = score.extracted_genres or None,
-            genres_not_in      = profile.disliked_genres or None,
-            artist_not_in      = profile.disliked_artists or None,
+            genres_in          = wanted_genres or None,
+            genres_not_in      = _union(score.unwanted_genres,  profile.disliked_genres),
+            artist_in          = wanted_artists or None,
+            artist_not_in      = _union(score.unwanted_artists, profile.disliked_artists),
+            songs_not_in       = score.unwanted_songs or None,
             preferred_language = score.preferred_language or None,
-            min_popularity     = MIN_POPULARITY_WHEN_POPULAR if score.wants_popular_songs > WANTS_POPULAR_THRESHOLD else None,
-            release_date_min   = today - timedelta(days=RECENT_WINDOW_DAYS) if score.wants_recent_songs > WANTS_RECENT_THRESHOLD else None,
+            # Explicit-only: popularity and recency are ranker-weight signals, not filters.
+            min_popularity     = None,
+            release_date_min   = None,
             release_date_max   = None,
         )
 
@@ -74,13 +76,13 @@ class RecommendationRequestBuilder:
             w_popularity=s.default_w_popularity,
             w_recency=s.default_w_recency,
         )
-        if score.wants_lyrics_focus > WANTS_LYRICS_FOCUS_THRESHOLD:
+        if score.wants_lyrics_focus is not None and score.wants_lyrics_focus > WANTS_LYRICS_FOCUS_THRESHOLD:
             weights.w_lyrics = LYRICS_FOCUS_W_LYRICS
             weights.w_audio  = LYRICS_FOCUS_W_AUDIO
-        if score.wants_mood_focus > WANTS_MOOD_FOCUS_THRESHOLD:
+        if score.wants_mood_focus is not None and score.wants_mood_focus > WANTS_MOOD_FOCUS_THRESHOLD:
             weights.w_lyrics = MOOD_FOCUS_W_LYRICS
             weights.w_audio  = MOOD_FOCUS_W_AUDIO
-        if score.wants_obscure_songs > WANTS_OBSCURE_THRESHOLD:
+        if score.wants_obscure_songs is not None and score.wants_obscure_songs > WANTS_OBSCURE_THRESHOLD:
             weights.w_popularity = OBSCURE_W_POPULARITY
         # Presets shift individual weights off the 1.0 sum; renormalize so score_total
         # stays comparable across requests (guard the degenerate near-zero sum).
@@ -93,3 +95,8 @@ class RecommendationRequestBuilder:
             weights.w_popularity /= total
             weights.w_recency /= total
         return weights
+
+
+def _union(a: list[str] | None, b: list[str] | None) -> list[str] | None:
+    merged = list({*(a or []), *(b or [])})
+    return merged or None

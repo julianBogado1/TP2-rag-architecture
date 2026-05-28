@@ -88,4 +88,7 @@ class ResponseGeneratorService:
 
 
 def _fields_above(obj, names: tuple[str, ...], threshold: float) -> list[str]:
-    return [n for n in names if getattr(obj, n, 0.0) > threshold]
+    # PromptScore moods and audio axes may be None when the prompt is silent on them;
+    # treat None as "no signal" rather than letting the comparison raise.
+    return [n for n in names
+            if (v := getattr(obj, n, None)) is not None and v > threshold]

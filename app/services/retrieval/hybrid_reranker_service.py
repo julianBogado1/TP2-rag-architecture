@@ -31,7 +31,8 @@ class HybridRerankerService:
         candidates: list[CandidateSong],
         req: SongRecommendationRequest,
     ) -> list[RankedSongCandidate]:
-        prompt_vec = self._to_audio_vec(req.target_audio_features)
+        target = req.target_audio_features
+        target_present = self._has_any_axis(target)
         w = req.ranking_weights
         out: list[RankedSongCandidate] = []
         for c in candidates:
@@ -39,10 +40,9 @@ class HybridRerankerService:
             profile    = self._profile_affinity(c, req.user_profile)
             pop_score  = self._popularity_score(c.popularity)
             rec_score  = self._recency_score(c.release_date)
-            if c.audio_features is None:
-                # Lyrics-only song (no Spotify audio): drop the audio axis and
-                # renormalize the remaining weights so its total stays comparable
-                # to audio-complete songs instead of being penalized by w_audio.
+            # Drop the audio axis when either side has no usable audio signal:
+            # candidate has no Spotify features, or the prompt didn't imply any axis.
+            if c.audio_features is None or not target_present:
                 denom = 1.0 - w.w_audio
                 scale = (1.0 / denom) if abs(denom) > 1e-9 else 1.0
                 breakdown = ScoreBreakdown(
@@ -53,7 +53,7 @@ class HybridRerankerService:
                     score_recency    = w.w_recency    * rec_score  * scale,
                 )
             else:
-                audio_sim = self._audio_similarity(prompt_vec, c.audio_features)
+                audio_sim = self._audio_similarity(target, c.audio_features)
                 breakdown = ScoreBreakdown(
                     score_lyrics     = w.w_lyrics     * lyrics_sim,
                     score_audio      = w.w_audio      * audio_sim,
@@ -76,15 +76,25 @@ class HybridRerankerService:
             ))
         return out
 
-    def _to_audio_vec(self, f: PromptAudioFeatures) -> list[float]:
-        return [getattr(f, name) for name in self._AUDIO_FEATURE_ORDER]
+    @classmethod
+    def _has_any_axis(cls, target: PromptAudioFeatures | None) -> bool:
+        if target is None:
+            return False
+        return any(getattr(target, name) is not None for name in cls._AUDIO_FEATURE_ORDER)
 
-    def _audio_similarity(self, prompt_vec: list[float], cand_audio: AudioFeatures) -> float:
-        # Alternative: 1.0 - sum(abs(p - c)) / 6 — Manhattan inverted; cheaper but ignores direction.
-        cand_vec = [getattr(cand_audio, name) for name in self._AUDIO_FEATURE_ORDER]
-        dot = sum(p * c for p, c in zip(prompt_vec, cand_vec))
-        norm_p = sqrt(sum(p * p for p in prompt_vec))
-        norm_c = sqrt(sum(c * c for c in cand_vec))
+    def _audio_similarity(self, target: PromptAudioFeatures, cand_audio: AudioFeatures) -> float:
+        # Alternative: 1.0 - sum(abs(p - c)) / k — Manhattan inverted; cheaper but ignores direction.
+        # Score only the axes the prompt actually implied; silent axes drop out entirely
+        # (rather than being treated as 0, which would penalise candidates without cause).
+        dims = [(getattr(target, n), getattr(cand_audio, n)) for n in self._AUDIO_FEATURE_ORDER
+                if getattr(target, n) is not None]
+        if not dims:
+            return 0.0
+        p_vec = [p for p, _ in dims]
+        c_vec = [c for _, c in dims]
+        dot = sum(p * c for p, c in zip(p_vec, c_vec))
+        norm_p = sqrt(sum(p * p for p in p_vec))
+        norm_c = sqrt(sum(c * c for c in c_vec))
         if norm_p == 0.0 or norm_c == 0.0:
             return 0.0
         return max(0.0, dot / (norm_p * norm_c))

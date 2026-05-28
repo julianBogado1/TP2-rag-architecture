@@ -3,13 +3,38 @@ from app.models.prompt_score import PromptScore
 
 
 _SYSTEM_PROMPT = """You convert a user's natural-language music request into a
-structured score. For every mood/intent field in the schema, output a float in
-[0, 1] reflecting how strongly the prompt expresses that mood. For audio_features,
-infer plausible target values (happy upbeat prompt -> high valence/energy/dance;
-melancholic prompt -> low valence, low energy, high acousticness). Set
-semantic_query to a clean English rephrasing optimized for embedding search:
-strip emojis, fix Spanglish, expand abbreviations. Extract any explicit
-artist/genre/language mentions; otherwise leave them null.
+structured score. Set semantic_query to a clean English rephrasing optimized for
+embedding search: strip emojis, fix Spanglish, expand abbreviations.
+
+NULL VS 0.0 (critical):
+For every mood/wants_* field and every audio_features axis, output a float in
+[0, 1] ONLY when the prompt actually implies that dimension. If the prompt is
+silent on a dimension, leave the field NULL (omit it). Reserve 0.0 for prompts
+that EXPLICITLY negate the dimension ("no high energy", "nothing sad",
+"not popular"). "Silent" and "explicitly absent" are different states — keep
+them distinguishable.
+
+WANTED VS UNWANTED (critical):
+Genre, artist, and song mentions carry polarity. Route them correctly:
+- wanted_genres / wanted_artists: positive mentions ("I want rap",
+  "songs by Taylor Swift", "artists like Ed Sheeran" -> wanted_artists=["Ed Sheeran"]).
+- unwanted_genres / unwanted_artists / unwanted_songs: negative mentions.
+  Negation cues: "no", "not", "without", "avoid", "except", "don't want",
+  "nothing", "hate", "skip". Example: "don't give me any rap songs" ->
+  unwanted_genres=["rap"]. A negated mention NEVER goes into a wanted_* list.
+- Leave any list null when no mention of that kind appears.
+
+GENRE VOCABULARY (critical):
+wanted_genres and unwanted_genres accept ONLY these canonical values:
+"country", "misc", "pop", "rap", "rb", "rock".
+Map common terms to the canonical form when possible:
+  hip-hop / hip hop / trap            -> "rap"
+  r&b / rnb / soul                    -> "rb"
+  metal / punk / alternative / indie  -> "rock"
+  electronic / edm / house / techno   -> "misc"
+  folk / classical / jazz / latin     -> "misc"
+If a mentioned genre does not map to one of these six, OMIT it (do not invent
+or substitute). Empty list -> null.
 
 LANGUAGE RULES (critical):
 - preferred_language must be a 2-letter ISO 639-1 code: "es", "en", "pt", "fr",
@@ -19,8 +44,7 @@ LANGUAGE RULES (critical):
   prompt itself in Spanish is NOT a request for Spanish-language songs — leave
   preferred_language null in that case.
 
-Never invent data the user didn't imply: output 0.0 for moods the prompt is
-silent on."""
+Never invent data the user didn't imply."""
 
 
 class PromptParserService:
