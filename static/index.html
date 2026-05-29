@@ -101,7 +101,6 @@
     .save-feedback { font-size: 0.78rem; color: var(--success); font-family: 'DM Mono', monospace; opacity: 0; transition: opacity 0.3s; }
     .save-feedback.show { opacity: 1; }
 
-    /* ── ONBOARDING MODAL ── */
     .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); z-index: 500; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease; }
     .modal-backdrop.hidden { display: none; }
     .modal { background: var(--surface); border: 1px solid rgba(200,169,110,0.2); border-radius: 16px; padding: 36px 40px; max-width: 520px; width: 90%; box-shadow: 0 24px 80px rgba(0,0,0,0.6); }
@@ -111,7 +110,6 @@
     .modal-skip { font-size: 0.75rem; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; display: block; text-align: center; margin-top: 12px; }
     .modal-skip:hover { color: var(--text); }
 
-    /* ── METRICS ── */
     .metrics-intro { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 28px; font-size: 0.85rem; line-height: 1.7; color: var(--muted); }
     .metrics-intro strong { color: var(--text); }
     .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; }
@@ -150,7 +148,6 @@
   <div class="ambient ambient-1"></div>
   <div class="ambient ambient-2"></div>
 
-  <!-- ONBOARDING MODAL -->
   <div class="modal-backdrop hidden" id="modal-backdrop">
     <div class="modal">
       <div class="modal-title">Bienvenido a <span style="color:var(--accent);font-style:italic">Songmind</span></div>
@@ -225,7 +222,6 @@
       <button class="tab" onclick="switchTab('metrics')">Métricas</button>
     </div>
 
-    <!-- RECOMMEND -->
     <div class="panel active" id="panel-recommend">
       <div class="section-label">¿Qué estás buscando?</div>
       <div class="prompt-wrap">
@@ -262,7 +258,6 @@
       </div>
     </div>
 
-    <!-- PROFILE -->
     <div class="panel" id="panel-profile">
       <div class="section-label">Perfil de usuario &middot; <span style="color:var(--accent);font-family:'DM Mono',monospace;font-size:0.65rem">user_001</span></div>
 
@@ -327,7 +322,6 @@
       <div class="divider"></div>
     </div>
 
-    <!-- METRICS -->
     <div class="panel" id="panel-metrics">
 
       <div class="metrics-grid">
@@ -337,7 +331,6 @@
             <div class="metric-badge badge-retrieval">Retrieval</div>
           </div>
           <div class="metric-desc">Las canciones relevantes aparecen primero? Penaliza que los mejores matches aparezcan al final.</div>
-          <div class="metric-formula">CP@K = sum(Precision@k x vk) / relevant_in_top_k<br>vk=1 si la cancion en rank k esta en GT</div>
           <div class="metric-value-row">
             <div class="metric-value" id="val-cp">--</div>
             <div class="metric-bar-wrap">
@@ -353,7 +346,6 @@
             <div class="metric-badge badge-retrieval">Retrieval</div>
           </div>
           <div class="metric-desc">Cuantas canciones relevantes aparecen en el top K? Capea el denominador en K para evitar scores ~0 con GT grandes.</div>
-          <div class="metric-formula">Recall@K = |top_K intersect GT| / min(K, |GT|)</div>
           <div class="metric-value-row">
             <div class="metric-value" id="val-rec">--</div>
             <div class="metric-bar-wrap">
@@ -369,7 +361,6 @@
             <div class="metric-badge badge-generation">Generation</div>
           </div>
           <div class="metric-desc">Las explicaciones del LLM estan respaldadas por los lyrics recuperados? Un juez GPT-4o-mini verifica cada claim.</div>
-          <div class="metric-formula">Faith = |explicaciones soportadas| / |total recomendaciones|</div>
           <div class="metric-value-row">
             <div class="metric-value" id="val-faith">--</div>
             <div class="metric-bar-wrap">
@@ -385,7 +376,6 @@
             <div class="metric-badge badge-generation">Generation</div>
           </div>
           <div class="metric-desc">La respuesta aborda lo que el usuario pidio? GPT genera 3 preguntas reversas y mide coseno con el prompt original.</div>
-          <div class="metric-formula">AR = (1/N) sum cos(embed(question_i), embed(prompt))</div>
           <div class="metric-value-row">
             <div class="metric-value" id="val-ar">--</div>
             <div class="metric-bar-wrap">
@@ -398,12 +388,10 @@
 
       <div class="section-label">Cargar resultados</div>
       <div class="run-eval-row">
-        <button class="btn btn-primary" onclick="loadEvalResults()">Cargar evaluation_results.json</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('eval-file').click()">Subir archivo</button>
+        <button class="btn btn-primary" onclick="document.getElementById('eval-file').click()">Subir evaluation_results.json</button>
         <input type="file" id="eval-file" accept=".json" style="display:none" onchange="loadEvalFile(event)" />
         <span class="eval-status" id="eval-status"></span>
       </div>
-      <!--  <div class="hint">Primero corra <code style="color:var(--accent2)">python scripts/run_evaluation.py</code> para generar <code style="color:var(--accent2)">data/evaluation_results.json</code>.</div> -->
 
       <div id="eval-table-wrap" style="display:none">
         <div class="results-table-wrap">
@@ -413,12 +401,6 @@
             </thead>
             <tbody id="eval-tbody"></tbody>
           </table>
-        </div>
-        <div class="gt-note">
-          <strong>Ground truth:</strong> construido desde MongoDB con audio features de Spotify.
-          Happy: valence &gt; 0.7 &middot; Sad: valence &lt; 0.3 &middot; Energetic: energy &gt; 0.8 &middot;
-          Calm: energy &lt; 0.3 &middot; Danceable: danceability &gt; 0.7 &middot;
-          Acoustic: acousticness &gt; 0.7 &middot; Instrumental: instrumentalness &gt; 0.5
         </div>
       </div>
 
@@ -432,7 +414,6 @@
     const tagStore = { 'fav-genres':[], 'dis-genres':[], 'fav-artists':[], 'dis-artists':[], 'fav-songs':[] };
     const modalTagStore = { 'fav-genres':[], 'dis-genres':[], 'fav-artists':[], 'dis-artists':[] };
 
-    // ── Onboarding ──
     async function checkOnboarding() {
       try {
         const res = await fetch(`${API_BASE}/users/${FIXED_USER}`);
@@ -502,7 +483,6 @@
     }
     function skipOnboarding() { document.getElementById('modal-backdrop').classList.add('hidden'); }
 
-    // ── Profile panel ──
     function renderTags(key) {
       const c = document.getElementById('tags-' + key);
       if (!c) return;
@@ -553,7 +533,6 @@
       }
     }
 
-    // ── Tabs ──
     function switchTab(name) {
       ['recommend','profile','metrics'].forEach((n, i) => {
         document.querySelectorAll('.tab')[i].classList.toggle('active', n === name);
@@ -562,7 +541,6 @@
       document.getElementById('panel-' + name).classList.add('active');
     }
 
-    // ── Recommend ──
     function updateCharCount() {
       document.getElementById('char-count').textContent = document.getElementById('prompt-input').value.length + ' / 2000';
     }
@@ -646,7 +624,6 @@
     function showError(msg) { const el = document.getElementById('error-box'); el.textContent = msg; el.classList.add('active'); }
     function hideError() { document.getElementById('error-box').classList.remove('active'); }
 
-    // ── Metrics ──
     async function loadEvalResults() {
       document.getElementById('eval-status').textContent = 'Cargando...';
       try {
@@ -675,7 +652,7 @@
       if (!rows.length) { document.getElementById('eval-status').textContent = 'Sin datos'; return; }
 
       const avgOf = k => rows.reduce((s,r) => s + (r[k] || 0), 0) / rows.length;
-      const avg = { cp: avgOf('cp_at_k'), rec: avgOf('recall_at_k'), faith: avgOf('faithfulness'), ar: avgOf('answer_relevance') };
+      const avg = { cp: avgOf('context_precision_at_k'), rec: avgOf('recall_at_k'), faith: avgOf('faithfulness'), ar: avgOf('answer_relevance') };
       const fmt = v => isNaN(v) ? '--' : v.toFixed(3);
 
       document.getElementById('val-cp').textContent    = fmt(avg.cp);
@@ -695,7 +672,7 @@
         const tr = document.createElement('tr');
         tr.innerHTML =
           '<td>' + escHtml(r.label || '--') + '</td>' +
-          '<td class="' + cc(r.cp_at_k) + '">' + fmt(r.cp_at_k) + '</td>' +
+          '<td class="' + cc(r.context_precision_at_k) + '">' + fmt(r.cp_at_k) + '</td>' +
           '<td class="' + cc(r.recall_at_k) + '">' + fmt(r.recall_at_k) + '</td>' +
           '<td class="' + cc(r.faithfulness) + '">' + fmt(r.faithfulness) + '</td>' +
           '<td class="' + cc(r.answer_relevance) + '">' + fmt(r.answer_relevance) + '</td>';
