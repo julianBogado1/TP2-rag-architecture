@@ -1,9 +1,9 @@
 from datetime import date
-from app.metrics.faithfulness import faithfulness_score
+from app.metrics.faithfulness import faithfulness_score, _build_context, _match_song
 from app.core.exceptions import LLMProviderError
 from app.models.recommendation_response import RecommendationResponse, SongRecommendation
 from app.models.ranked_song import TopRecommendedSong, ScoreBreakdown
-from app.models.song_candidate import SongMetadata
+from app.models.song_candidate import SongMetadata, AudioFeatures
 
 
 def _top_song(track="t", artist="a"):
@@ -66,3 +66,34 @@ def test_failed_judge_excluded_from_denominator():
     resp = RecommendationResponse(message="m", recommendations=[_rec(track="t1"), _rec(track="t2")])
     top = [_top_song(track="t1"), _top_song(track="t2")]
     assert faithfulness_score(resp, top, _MixedLLM()) == 1.0
+
+
+def _audio_song(track="t", artist="a"):
+    return TopRecommendedSong(
+        song_id="1", track_name=track, artist_name=artist, score_total=0.5,
+        score_breakdown=ScoreBreakdown(score_lyrics=0.5, score_audio=0.0, score_profile=0.0,
+                                       score_popularity=0.0, score_recency=0.0),
+        evidence_chunks=["la la la"],
+        metadata=SongMetadata(track_name=track, artist_name=artist, genres=["rock"],
+                              popularity=50, release_date=date(2024, 1, 1),
+                              audio_features=AudioFeatures(valence=0.8, energy=0.9, danceability=0.7,
+                                                           acousticness=0.1, instrumentalness=0.0,
+                                                           tempo_norm=0.6)),
+    )
+
+
+def test_rank_fallback_matches_when_name_differs():
+    # LLM rephrased the track name; key lookup misses, rank position recovers it.
+    rec = SongRecommendation(rank=1, track_name="Totally Different Title", artist_name="Someone Else",
+                             explanation="x", matched_mood=[], matched_audio_features=[])
+    song = _audio_song(track="t", artist="a")
+    assert _match_song(rec, {("t", "a"): song}, [song]) is song
+
+
+def test_context_includes_structured_facts():
+    rec = _rec()
+    ctx = _build_context(_audio_song(), rec)
+    assert "Lyrics:" in ctx
+    assert "Genres: rock" in ctx
+    assert "energy=0.90" in ctx          # audio facts now visible to the judge
+    assert "Matched moods: happy" in ctx

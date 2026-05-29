@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Sample 200k usable song_ids from MongoDB.
+"""Sample song_ids from MongoDB.
 
 Usage:
-    .venv/bin/python scripts/sample_songs.py [--strategy random|balanced] [--count 200000]
+    .venv/bin/python scripts/sample_songs.py [--strategy random|balanced|audio_first] [--count 200000]
 
 Outputs: scripts/sample_200k_ids.json
 """
@@ -21,7 +21,7 @@ from pymongo import MongoClient
 
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--strategy", choices=["random", "balanced"], default="balanced")
+    p.add_argument("--strategy", choices=["random", "balanced", "audio_first"], default="audio_first")
     p.add_argument("--count", type=int, default=200_000)
     return p.parse_args()
 
@@ -56,6 +56,61 @@ def sample_balanced(col, n: int) -> list[int]:
         ids_by_genre[genre] = [doc["song_id"] for doc in col.aggregate(pipeline)]
 
     return balance(ids_by_genre, n)
+
+
+def sample_audio_first(col, n: int) -> list[int]:
+    """Include all songs with audio features, fill remainder balanced by genre."""
+    af_match = {
+        "danceability": {"$exists": True, "$ne": None},
+        "lyrics": {"$nin": [None, ""]},
+        "tag": {"$nin": [None, ""]},
+    }
+    af_ids = [doc["song_id"] for doc in col.find(af_match, {"song_id": 1, "_id": 0})]
+    print(f"  {len(af_ids):,} songs with audio features (all included)")
+
+    remaining = n - len(af_ids)
+    if remaining <= 0:
+        print(f"  Audio features songs exceed target {n:,} — truncating")
+        random.shuffle(af_ids)
+        return af_ids[:n]
+
+    # Genre availability for non-AF songs
+    genre_counts = {
+        doc["_id"]: doc["count"]
+        for doc in col.aggregate([
+            {"$match": {
+                "$or": [{"danceability": {"$exists": False}}, {"danceability": None}],
+                "lyrics": {"$nin": [None, ""]},
+                "tag": {"$nin": [None, ""]},
+            }},
+            {"$group": {"_id": "$tag", "count": {"$sum": 1}}},
+            {"$match": {"_id": {"$ne": None}}},
+        ])
+    }
+    genres = sorted(genre_counts.keys())
+    per_genre = ceil(remaining / len(genres))
+    print(f"  {len(genres)} genres — targeting {per_genre:,} non-AF songs/genre ({remaining:,} total fill)")
+    for g in genres:
+        avail = genre_counts[g]
+        actual = min(per_genre, avail)
+        print(f"    {g}: {actual:,} / {avail:,} available")
+
+    ids_by_genre: dict[str, list[int]] = {}
+    for genre in genres:
+        target = min(per_genre, genre_counts[genre])
+        pipeline = [
+            {"$match": {
+                "$or": [{"danceability": {"$exists": False}}, {"danceability": None}],
+                "lyrics": {"$nin": [None, ""]},
+                "tag": genre,
+            }},
+            {"$sample": {"size": target}},
+            {"$project": {"_id": 0, "song_id": 1}},
+        ]
+        ids_by_genre[genre] = [doc["song_id"] for doc in col.aggregate(pipeline)]
+
+    fill_ids = balance(ids_by_genre, remaining)
+    return af_ids + fill_ids
 
 
 def balance(ids_by_genre: dict[str, list[int]], n: int) -> list[int]:
@@ -93,8 +148,10 @@ def main():
     print(f"Sampling {args.count:,} songs with strategy='{args.strategy}'...")
     if args.strategy == "random":
         ids = sample_random(col, args.count)
-    else:
+    elif args.strategy == "balanced":
         ids = sample_balanced(col, args.count)
+    else:
+        ids = sample_audio_first(col, args.count)
 
     client.close()
 

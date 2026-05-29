@@ -51,6 +51,26 @@ RESULTS_PATH = Path(__file__).parent.parent / "data" / "evaluation_results.json"
 K = 10
 
 
+def audio_bearing(top_songs: list) -> list:
+    """Keep only songs that carry Spotify audio features.
+
+    Audio test cases are scored against this subset so that no-audio songs
+    retrieved on lyric similarity don't count as misses against an
+    audio-feature ground truth.
+    """
+    return [s for s in top_songs if s.metadata.audio_features is not None]
+
+
+def score_case(kind: str, top_songs: list, gt_ids: set, k: int) -> tuple[float, float]:
+    """Compute (context_precision@k, recall@k) for one case.
+
+    audio cases score over the audio-bearing subset; genre cases score over all
+    returned songs (relevance is decided by the GT id set).
+    """
+    scored = audio_bearing(top_songs) if kind == "audio" else top_songs
+    return context_precision_at_k(scored, gt_ids, k), recall_at_k(scored, gt_ids, k)
+
+
 def build_services():
     mongo = MongoClient(settings.mongo_uri)
     db = mongo[settings.mongo_db_name]
@@ -114,7 +134,7 @@ def main() -> None:
     svc = build_services()
 
     results = []
-    header = f"{'Label':<14} {'CP@K':>6} {'Rec@K':>6} {'Faith':>6} {'AnsRel':>7}"
+    header = f"{'Label':<16} {'Kind':<6} {'CP@K':>6} {'Rec@K':>6} {'Faith':>6} {'AnsRel':>7}"
     print(header)
     print("-" * len(header))
 
@@ -123,23 +143,24 @@ def main() -> None:
             label = tc["label"]
             prompt = tc["prompt"]
             user_id = tc["user_id"]
+            kind = tc.get("kind", "audio")  # default keeps old GT files working
             gt_ids = set(tc["gt_song_ids"])
 
             try:
                 top_songs, response = run_pipeline(svc, user_id, prompt)
                 if top_songs is None:
-                    print(f"{label:<14} — no results")
+                    print(f"{label:<16} {kind:<6} — no results")
                     continue
 
-                cp = context_precision_at_k(top_songs, gt_ids, K)
-                rec = recall_at_k(top_songs, gt_ids, K)
+                cp, rec = score_case(kind, top_songs, gt_ids, K)
                 faith = faithfulness_score(response, top_songs, svc["llm"])
                 ar = answer_relevance_score(prompt, response, svc["embedder"], svc["llm"])
 
-                print(f"{label:<14} {cp:>6.3f} {rec:>6.3f} {faith:>6.3f} {ar:>7.3f}")
+                print(f"{label:<16} {kind:<6} {cp:>6.3f} {rec:>6.3f} {faith:>6.3f} {ar:>7.3f}")
 
                 results.append({
                     "label": label,
+                    "kind": kind,
                     "prompt": prompt,
                     "context_precision_at_k": round(cp, 4),
                     "recall_at_k": round(rec, 4),
@@ -147,23 +168,32 @@ def main() -> None:
                     "answer_relevance": round(ar, 4),
                 })
             except Exception as e:  # isolate one bad case from the whole run
-                print(f"{label:<14} — ERROR: {e}")
-                results.append({"label": label, "prompt": prompt, "error": str(e)})
+                print(f"{label:<16} {kind:<6} — ERROR: {e}")
+                results.append({"label": label, "kind": kind, "prompt": prompt, "error": str(e)})
 
             # write incrementally so a later crash doesn't discard prior results
             RESULTS_PATH.write_text(json.dumps(results, indent=2))
 
         scored = [r for r in results if "error" not in r]
         if scored:
-            avg_cp = sum(r["context_precision_at_k"] for r in scored) / len(scored)
-            avg_rec = sum(r["recall_at_k"] for r in scored) / len(scored)
-            avg_faith = sum(r["faithfulness"] for r in scored) / len(scored)
-            avg_ar = sum(r["answer_relevance"] for r in scored) / len(scored)
             print("-" * len(header))
-            print(f"{'AVERAGE':<14} {avg_cp:>6.3f} {avg_rec:>6.3f} {avg_faith:>6.3f} {avg_ar:>7.3f}")
+            _print_avg("AVERAGE (all)", scored, header)
+            for k in ("audio", "genre"):
+                subset = [r for r in scored if r.get("kind") == k]
+                if subset:
+                    _print_avg(f"avg [{k}]", subset, header)
             print(f"\nSaved to {RESULTS_PATH}")
     finally:
         svc["mongo"].close()
+
+
+def _print_avg(name: str, rows: list[dict], header: str) -> None:
+    n = len(rows)
+    avg_cp = sum(r["context_precision_at_k"] for r in rows) / n
+    avg_rec = sum(r["recall_at_k"] for r in rows) / n
+    avg_faith = sum(r["faithfulness"] for r in rows) / n
+    avg_ar = sum(r["answer_relevance"] for r in rows) / n
+    print(f"{name:<16} {'':<6} {avg_cp:>6.3f} {avg_rec:>6.3f} {avg_faith:>6.3f} {avg_ar:>7.3f}")
 
 
 if __name__ == "__main__":

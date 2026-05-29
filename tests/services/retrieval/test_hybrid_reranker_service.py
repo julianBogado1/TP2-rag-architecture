@@ -106,14 +106,26 @@ def test_no_audio_song_scores_zero_on_audio_axis():
     assert isclose(total, r.score_total, abs_tol=1e-6)
 
 
-def test_no_audio_renormalizes_remaining_weights():
+def test_no_audio_song_not_boosted_on_lyrics():
+    # No redistribution: a missing audio axis simply contributes 0, the lyrics
+    # weight is NOT scaled up. The song earns exactly w_lyrics * lyrics_sim.
     svc = HybridRerankerService()
     weights = RankingWeights(w_lyrics=0.55, w_audio=0.30, w_profile=0.10,
                               w_popularity=0.03, w_recency=0.02)
     r = svc.rerank([_no_audio_candidate(lyrics_sim=0.8)], _request(weights=weights))[0]
-    # lyrics contribution is scaled up by 1/(1 - w_audio) so the song isn't
-    # penalized for missing audio (would be 0.55*0.8 = 0.44 without renormalization).
-    assert r.score_breakdown.score_lyrics > 0.55 * 0.8
+    assert isclose(r.score_breakdown.score_lyrics, 0.55 * 0.8, abs_tol=1e-6)
+
+
+def test_audio_match_outranks_equal_lyrics_no_audio_song():
+    # On an audio-intent prompt, an audio song that matches must beat a no-audio
+    # song with identical lyrics similarity — the audio axis is the tie-breaker,
+    # and no-audio songs are no longer boosted above it.
+    svc = HybridRerankerService()
+    audio_song   = _candidate(song_id="1", lyrics_sim=0.8)          # matches target audio
+    no_audio_song = _no_audio_candidate(song_id="2", lyrics_sim=0.8)
+    ranked = svc.rerank([audio_song, no_audio_song], _request())
+    by_id = {r.song_id: r.score_total for r in ranked}
+    assert by_id["1"] > by_id["2"]
 
 
 # --- Prompt-target nullability -------------------------------------------

@@ -40,27 +40,22 @@ class HybridRerankerService:
             profile    = self._profile_affinity(c, req.user_profile)
             pop_score  = self._popularity_score(c.popularity)
             rec_score  = self._recency_score(c.release_date)
-            # Drop the audio axis when either side has no usable audio signal:
-            # candidate has no Spotify features, or the prompt didn't imply any axis.
-            if c.audio_features is None or not target_present:
-                denom = 1.0 - w.w_audio
-                scale = (1.0 / denom) if abs(denom) > 1e-9 else 1.0
-                breakdown = ScoreBreakdown(
-                    score_lyrics     = w.w_lyrics     * lyrics_sim * scale,
-                    score_audio      = 0.0,
-                    score_profile    = w.w_profile    * profile    * scale,
-                    score_popularity = w.w_popularity * pop_score  * scale,
-                    score_recency    = w.w_recency    * rec_score  * scale,
-                )
+            # Additive polynomial: each axis contributes weight·score only when it is
+            # both *wanted* (prompt implied it) and *present* (song has the data).
+            # An absent axis contributes 0 and its weight is NOT redistributed — so a
+            # no-audio song earns nothing on audio rather than getting its lyrics
+            # weight boosted, and a real audio match keeps the edge it deserves.
+            if target_present and c.audio_features is not None:
+                audio_score = w.w_audio * self._audio_similarity(target, c.audio_features)
             else:
-                audio_sim = self._audio_similarity(target, c.audio_features)
-                breakdown = ScoreBreakdown(
-                    score_lyrics     = w.w_lyrics     * lyrics_sim,
-                    score_audio      = w.w_audio      * audio_sim,
-                    score_profile    = w.w_profile    * profile,
-                    score_popularity = w.w_popularity * pop_score,
-                    score_recency    = w.w_recency    * rec_score,
-                )
+                audio_score = 0.0
+            breakdown = ScoreBreakdown(
+                score_lyrics     = w.w_lyrics     * lyrics_sim,
+                score_audio      = audio_score,
+                score_profile    = w.w_profile    * profile,
+                score_popularity = w.w_popularity * pop_score,
+                score_recency    = w.w_recency    * rec_score,
+            )
             total = (breakdown.score_lyrics + breakdown.score_audio
                      + breakdown.score_profile + breakdown.score_popularity
                      + breakdown.score_recency)

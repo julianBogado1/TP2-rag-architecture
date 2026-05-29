@@ -1,4 +1,5 @@
 import logging
+import re
 
 from pydantic import BaseModel
 from app.core.llm_client import OpenAILLMClient
@@ -11,14 +12,63 @@ logger = logging.getLogger(__name__)
 _MODEL = "gpt-4o-mini"
 
 _SYSTEM = (
-    "You are an evaluation judge. Given a lyric context and an explanation, "
-    "decide if every factual claim in the explanation can be inferred from the context. "
-    "Return supported=true only if ALL claims are grounded in the context."
+    "You are an evaluation judge. You are given the CONTEXT the recommender actually "
+    "had for a song — lyric excerpts plus structured facts (genres, audio features, and "
+    "the moods/audio traits the system matched) — and an EXPLANATION it produced. "
+    "Decide whether every factual claim in the explanation can be inferred from that "
+    "context. A claim about mood, energy, danceability, tempo or genre is supported when "
+    "the corresponding fact appears in the context (e.g. 'high energy' is supported by "
+    "energy=0.8; 'happy' by a matched mood or high valence). Return supported=true only "
+    "if ALL claims are grounded in the context."
 )
+
+# audio axes carried on SongMetadata.audio_features
+_AUDIO_AXES = ("valence", "energy", "danceability",
+               "acousticness", "instrumentalness", "tempo_norm")
 
 
 class _Judgment(BaseModel):
     supported: bool
+
+
+def _normalize(name: str) -> str:
+    """Loose normalisation so 'Song (feat. X)' and 'song' match the same key."""
+    name = name.lower().strip()
+    name = re.sub(r"\(feat\.?.*?\)|\bfeat\.?\b.*$", "", name)  # drop featured-artist noise
+    name = re.sub(r"[^a-z0-9 ]+", "", name)                     # drop punctuation
+    return re.sub(r"\s+", " ", name).strip()
+
+
+def _match_song(rec: SongRecommendation,
+                by_key: dict[tuple[str, str], TopRecommendedSong],
+                ordered: list[TopRecommendedSong]) -> TopRecommendedSong | None:
+    """Map a recommendation back to its source song: try a normalised (track, artist)
+    key first, then fall back to rank position (one rec per top song, in order)."""
+    hit = by_key.get((_normalize(rec.track_name), _normalize(rec.artist_name)))
+    if hit is not None:
+        return hit
+    idx = rec.rank - 1
+    if 0 <= idx < len(ordered):
+        return ordered[idx]
+    return None
+
+
+def _build_context(song: TopRecommendedSong, rec: SongRecommendation) -> str:
+    """The full grounded context the recommender had: lyrics + structured facts."""
+    parts: list[str] = []
+    if song.evidence_chunks:
+        parts.append("Lyrics: " + " | ".join(song.evidence_chunks))
+    if song.metadata.genres:
+        parts.append("Genres: " + ", ".join(song.metadata.genres))
+    af = song.metadata.audio_features
+    if af is not None:
+        parts.append("Audio features: " + ", ".join(
+            f"{axis}={getattr(af, axis):.2f}" for axis in _AUDIO_AXES))
+    if rec.matched_mood:
+        parts.append("Matched moods: " + ", ".join(rec.matched_mood))
+    if rec.matched_audio_features:
+        parts.append("Matched audio traits: " + ", ".join(rec.matched_audio_features))
+    return "\n".join(parts)
 
 
 def faithfulness_score(
@@ -27,15 +77,17 @@ def faithfulness_score(
     llm: OpenAILLMClient,
 ) -> float:
     """
-    Faithfulness: fraction of LLM explanations fully supported by lyric evidence.
+    Faithfulness: fraction of LLM explanations grounded in the context the recommender
+    actually had — lyric evidence plus the structured facts (genres, audio features,
+    matched moods) the explanation is allowed to cite.
 
-    Faithfulness = |explanations supported by evidence_chunks| / |total recommendations|
+    Faithfulness = |explanations supported by context| / |explanations judged|
     """
     if not response.recommendations:
         return 0.0
 
-    chunks_by_track = {
-        (s.track_name.strip().lower(), s.artist_name.strip().lower()): s.evidence_chunks
+    by_key = {
+        (_normalize(s.track_name), _normalize(s.artist_name)): s
         for s in top_songs
     }
 
@@ -44,21 +96,23 @@ def faithfulness_score(
     for rec in response.recommendations:
         if not rec.explanation:
             continue
-        key = (rec.track_name.strip().lower(), rec.artist_name.strip().lower())
-        chunks = chunks_by_track.get(key)
-        if not chunks:
+        song = _match_song(rec, by_key, top_songs)
+        if song is None:
+            logger.warning("faithfulness: no source song for rec %r", rec.track_name)
             continue
-        context = " | ".join(chunks)
-        user_msg = f"Context: {context}\n\nExplanation: {rec.explanation}"
+        context = _build_context(song, rec)
+        if not context:
+            continue
+        user_msg = f"Context:\n{context}\n\nExplanation: {rec.explanation}"
         try:
             judgment = llm.parse_structured(_MODEL, _SYSTEM, user_msg, _Judgment)
         except LLMProviderError as e:
             # A judge failure is an infra error, not a hallucination — exclude it
             # from the denominator so it doesn't silently lower the score.
-            logger.warning("faithfulness judge failed for %s: %s", key, e)
+            logger.warning("faithfulness judge failed for %s: %s", rec.track_name, e)
             continue
         if judgment is None:
-            logger.warning("faithfulness judge returned None for %s", key)
+            logger.warning("faithfulness judge returned None for %s", rec.track_name)
             continue
         judged += 1
         if judgment.supported:
