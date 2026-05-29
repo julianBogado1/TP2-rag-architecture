@@ -22,50 +22,72 @@ def _rec(track="t", artist="a"):
                               matched_mood=["happy"], matched_audio_features=["valence"])
 
 
-class _Judgment:
+class _FakeClaim:
     def __init__(self, supported):
         self.supported = supported
 
 
+class _FakeJudgment:
+    """Mimics the production _Judgment: a list of per-claim verdicts."""
+    def __init__(self, *supported_flags):
+        self.claims = [_FakeClaim(s) for s in supported_flags]
+
+
 class _FakeLLM:
-    def __init__(self, behavior):
-        self.behavior = behavior
-
-    def parse_structured(self, *args, **kwargs):
-        if self.behavior == "error":
-            raise LLMProviderError("boom")
-        if self.behavior == "none":
-            return None
-        return _Judgment(True)
-
-
-def test_supported_explanation_scores_one():
-    resp = RecommendationResponse(message="m", recommendations=[_rec()])
-    assert faithfulness_score(resp, [_top_song()], _FakeLLM("supported")) == 1.0
-
-
-def test_all_judge_errors_returns_zero_not_penalized():
-    resp = RecommendationResponse(message="m", recommendations=[_rec()])
-    assert faithfulness_score(resp, [_top_song()], _FakeLLM("error")) == 0.0
-
-
-class _MixedLLM:
-    def __init__(self):
+    """Returns a queued _FakeJudgment per call, or raises on the first call for infra cases."""
+    def __init__(self, *judgments, raise_first=False):
+        self.judgments = list(judgments)
+        self.raise_first = raise_first
         self.calls = 0
 
     def parse_structured(self, *args, **kwargs):
         self.calls += 1
-        if self.calls == 1:
+        if self.raise_first and self.calls == 1:
             raise LLMProviderError("boom")
-        return _Judgment(True)
+        return self.judgments.pop(0)
+
+
+def test_all_claims_supported_scores_one():
+    resp = RecommendationResponse(message="m", recommendations=[_rec()])
+    llm = _FakeLLM(_FakeJudgment(True, True))
+    assert faithfulness_score(resp, [_top_song()], llm) == 1.0
+
+
+def test_partial_claims_scored_as_fraction():
+    # 2 of 3 claims grounded -> 2/3 (old all-or-nothing behaviour gave 0.0)
+    resp = RecommendationResponse(message="m", recommendations=[_rec()])
+    llm = _FakeLLM(_FakeJudgment(True, True, False))
+    assert abs(faithfulness_score(resp, [_top_song()], llm) - 2 / 3) < 1e-9
+
+
+def test_micro_average_pools_claims_across_recommendations():
+    # rec1 -> 2/2 supported, rec2 -> 1/2 supported  => 3 supported / 4 total = 0.75
+    resp = RecommendationResponse(message="m", recommendations=[_rec(track="t1"), _rec(track="t2")])
+    top = [_top_song(track="t1"), _top_song(track="t2")]
+    llm = _FakeLLM(_FakeJudgment(True, True), _FakeJudgment(True, False))
+    assert faithfulness_score(resp, top, llm) == 0.75
+
+
+def test_all_judge_errors_returns_zero_not_penalized():
+    resp = RecommendationResponse(message="m", recommendations=[_rec()])
+    llm = _FakeLLM(raise_first=True)
+    assert faithfulness_score(resp, [_top_song()], llm) == 0.0
 
 
 def test_failed_judge_excluded_from_denominator():
-    # one judge errors, one is supported -> 1 supported / 1 judged = 1.0
-    # (old behaviour wrongly gave 1/2 = 0.5 by counting the error as unsupported)
+    # one rec's judge errors, the other returns 1/1 supported -> 1 supported / 1 total = 1.0
+    # (the errored rec contributes nothing to numerator or denominator)
     resp = RecommendationResponse(message="m", recommendations=[_rec(track="t1"), _rec(track="t2")])
     top = [_top_song(track="t1"), _top_song(track="t2")]
-    assert faithfulness_score(resp, top, _MixedLLM()) == 1.0
+    llm = _FakeLLM(_FakeJudgment(True), raise_first=True)
+    assert faithfulness_score(resp, top, llm) == 1.0
+
+
+def test_empty_claim_list_contributes_nothing():
+    # judge extracts no claims from the only rec -> no claims judged -> 0.0
+    resp = RecommendationResponse(message="m", recommendations=[_rec()])
+    llm = _FakeLLM(_FakeJudgment())
+    assert faithfulness_score(resp, [_top_song()], llm) == 0.0
 
 
 def _audio_song(track="t", artist="a"):

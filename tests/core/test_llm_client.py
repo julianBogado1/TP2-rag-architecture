@@ -89,3 +89,35 @@ def test_generate_structured_wraps_openai_error():
 
     with pytest.raises(LLMProviderError):
         client.generate_structured("gpt-x", "sys", _Schema(value="ctx"), _Schema)
+
+
+class _CapturingOpenAIClient(_FakeOpenAIClient):
+    """Records the kwargs passed to the SDK parse() call."""
+    def __init__(self, *, result=None):
+        super().__init__(result=result)
+        self.captured: dict = {}
+
+    def _parse(self, **kwargs):
+        self.captured = kwargs
+        return self._result
+
+
+def test_parse_structured_forwards_temperature_when_given():
+    client = OpenAILLMClient(api_key="sk-test")
+    fake = _CapturingOpenAIClient(result=_completion_with_parsed(_Schema(value="ok")))
+    client._client = fake
+
+    client.parse_structured("gpt-x", "sys", "usr", _Schema, temperature=0)
+
+    assert fake.captured["temperature"] == 0
+
+
+def test_parse_structured_omits_temperature_by_default():
+    # Default path must not pin temperature, preserving existing callers' behaviour.
+    client = OpenAILLMClient(api_key="sk-test")
+    fake = _CapturingOpenAIClient(result=_completion_with_parsed(_Schema(value="ok")))
+    client._client = fake
+
+    client.parse_structured("gpt-x", "sys", "usr", _Schema)
+
+    assert "temperature" not in fake.captured

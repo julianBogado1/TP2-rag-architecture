@@ -15,11 +15,12 @@ _SYSTEM = (
     "You are an evaluation judge. You are given the CONTEXT the recommender actually "
     "had for a song — lyric excerpts plus structured facts (genres, audio features, and "
     "the moods/audio traits the system matched) — and an EXPLANATION it produced. "
-    "Decide whether every factual claim in the explanation can be inferred from that "
-    "context. A claim about mood, energy, danceability, tempo or genre is supported when "
-    "the corresponding fact appears in the context (e.g. 'high energy' is supported by "
-    "energy=0.8; 'happy' by a matched mood or high valence). Return supported=true only "
-    "if ALL claims are grounded in the context."
+    "Decompose the explanation into its atomic factual claims (one verifiable statement "
+    "each). For every claim, set supported=true if it can be inferred from the context, "
+    "false otherwise. A claim about mood, energy, danceability, tempo or genre is "
+    "supported when the corresponding fact appears in the context (e.g. 'high energy' is "
+    "supported by energy=0.8; 'happy' by a matched mood or high valence). Return one "
+    "entry per claim."
 )
 
 # audio axes carried on SongMetadata.audio_features
@@ -27,8 +28,13 @@ _AUDIO_AXES = ("valence", "energy", "danceability",
                "acousticness", "instrumentalness", "tempo_norm")
 
 
-class _Judgment(BaseModel):
+class _Claim(BaseModel):
+    text: str
     supported: bool
+
+
+class _Judgment(BaseModel):
+    claims: list[_Claim]
 
 
 def _normalize(name: str) -> str:
@@ -77,11 +83,15 @@ def faithfulness_score(
     llm: OpenAILLMClient,
 ) -> float:
     """
-    Faithfulness: fraction of LLM explanations grounded in the context the recommender
-    actually had — lyric evidence plus the structured facts (genres, audio features,
-    matched moods) the explanation is allowed to cite.
+    Faithfulness (RAGAS, claim-level): fraction of the individual factual claims across
+    all explanations that are grounded in the context the recommender actually had —
+    lyric evidence plus the structured facts (genres, audio features, matched moods)
+    the explanation is allowed to cite.
 
-    Faithfulness = |explanations supported by context| / |explanations judged|
+    The judge decomposes each explanation into atomic claims and marks each one
+    supported/unsupported; we pool all claims across recommendations (micro-average):
+
+        Faithfulness = |claims inferable from context| / |total claims judged|
     """
     if not response.recommendations:
         return 0.0
@@ -92,7 +102,7 @@ def faithfulness_score(
     }
 
     supported = 0
-    judged = 0
+    total = 0
     for rec in response.recommendations:
         if not rec.explanation:
             continue
@@ -114,8 +124,10 @@ def faithfulness_score(
         if judgment is None:
             logger.warning("faithfulness judge returned None for %s", rec.track_name)
             continue
-        judged += 1
-        if judgment.supported:
-            supported += 1
+        if not judgment.claims:
+            # No claims extracted — nothing to attribute, contributes nothing.
+            continue
+        total += len(judgment.claims)
+        supported += sum(1 for c in judgment.claims if c.supported)
 
-    return supported / judged if judged > 0 else 0.0
+    return supported / total if total > 0 else 0.0

@@ -8,7 +8,8 @@ T = TypeVar("T", bound=BaseModel)
 
 class LLMClient(Protocol):
     def parse_structured(
-        self, model: str, system: str, user: str, schema: type[T]
+        self, model: str, system: str, user: str, schema: type[T],
+        temperature: float | None = None,
     ) -> T | None: ...
 
     def generate_structured(
@@ -25,8 +26,12 @@ class OpenAILLMClient:
         )
 
     def parse_structured(
-        self, model: str, system: str, user: str, schema: type[T]
+        self, model: str, system: str, user: str, schema: type[T],
+        temperature: float | None = None,
     ) -> T | None:
+        # Only pin temperature when a caller asks for it (e.g. evaluation wants
+        # temperature=0 for reproducibility); otherwise keep the model default.
+        extra = {} if temperature is None else {"temperature": temperature}
         try:
             completion = self._client.beta.chat.completions.parse(
                 model=model,
@@ -35,6 +40,7 @@ class OpenAILLMClient:
                     {"role": "user", "content": user},
                 ],
                 response_format=schema,
+                **extra,
             )
         except OpenAIError as e:
             raise LLMProviderError(str(e)) from e
