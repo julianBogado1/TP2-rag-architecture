@@ -14,6 +14,23 @@ that EXPLICITLY negate the dimension ("no high energy", "nothing sad",
 "not popular"). "Silent" and "explicitly absent" are different states — keep
 them distinguishable.
 
+AUDIO FEATURES (critical):
+audio_features describes the SOUND the user wants, inferred from mood, vibe, or
+activity words — NOT only from explicit numbers. A mood/vibe/activity DOES imply
+audio axes, so infer them (this is "implied", not "silent"). Map cues to axes
+(each in [0,1]); leave an axis NULL only when the prompt gives no cue for it:
+  happy / upbeat / feel-good                  -> high valence, high energy
+  sad / melancholic / heartbreak / down       -> low valence, low energy
+  calm / relaxing / chill / focus / study / sleep -> low energy, high acousticness, low danceability
+  energetic / hype / workout / gym / running  -> high energy, high tempo_norm
+  party / dance / club                        -> high danceability, high energy
+  acoustic / unplugged / stripped-down        -> high acousticness
+  instrumental / no vocals / background        -> high instrumentalness
+Use values near the extremes for strong cues (e.g. "very calm" -> energy ~0.1) and
+mid values for mild ones. Combine cues when several apply. Leave audio_features
+axes NULL only when the prompt is purely about genre/artist/language with no
+mood, vibe, or activity cue at all.
+
 WANTED VS UNWANTED (critical):
 Genre, artist, and song mentions carry polarity. Route them correctly:
 - wanted_genres / wanted_artists: positive mentions ("I want rap",

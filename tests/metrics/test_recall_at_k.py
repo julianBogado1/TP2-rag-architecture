@@ -22,3 +22,16 @@ def test_k_zero_returns_zero_not_crash():
 
 def test_empty_gt_returns_zero():
     assert recall_at_k([_s("1")], set(), k=10) == 0.0
+
+
+def test_pool_size_caps_denominator():
+    # 1 relevant of a pool of 2 eligible songs, huge GT, k=10.
+    # Without pool_size: denom=10 -> 0.1. With pool_size=2: denom=2 -> 0.5.
+    gt = {str(i) for i in range(1000)}
+    assert recall_at_k([_s("1"), _s("999999")], gt, k=10) == 0.1
+    assert recall_at_k([_s("1"), _s("999999")], gt, k=10, pool_size=2) == 0.5
+
+
+def test_pool_size_does_not_inflate_above_gt_or_k():
+    # pool_size only ever tightens the denominator, never loosens it.
+    assert recall_at_k([_s("1"), _s("2")], {"1", "2"}, k=10, pool_size=100) == 1.0

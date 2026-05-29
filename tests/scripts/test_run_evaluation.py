@@ -21,15 +21,20 @@ def test_audio_bearing_drops_no_audio_songs():
 
 
 def test_score_case_audio_ignores_no_audio_songs():
-    # "2" is in GT but has no audio -> excluded from the audio-case denominator/numerator.
+    # "2" is in GT but has no audio -> excluded from the audio-case pool entirely.
+    # Pool = [s1]; recall denom = min(10, |GT|, pool=1) = 1 -> the one audio match scores 1.0.
     songs = [_song("1", True), _song("2", False)]
-    cp, rec = run_evaluation.score_case("audio", songs, {"1", "2"}, k=10)
+    cp, rec, ndcg = run_evaluation.score_case("audio", songs, {"1", "2"}, k=10)
     assert cp == 1.0           # the single audio-bearing song is relevant
-    assert rec == 0.5          # 1 of min(10, 2) GT songs surfaced among audio-bearing
+    assert rec == 1.0          # 1 relevant of a pool of 1 audio-bearing song
+    # ndcg's IDCG still targets min(k,|GT|)=2 ideal hits but only 1 audio song exists,
+    # so it's < 1.0 — ndcg keeps a coverage signal that recall (pool-capped) drops.
+    assert 0.0 < ndcg < 1.0
 
 
 def test_score_case_genre_counts_all_returned_songs():
     songs = [_song("1", True), _song("2", False)]
-    cp, rec = run_evaluation.score_case("genre", songs, {"1", "2"}, k=10)
+    cp, rec, ndcg = run_evaluation.score_case("genre", songs, {"1", "2"}, k=10)
     assert cp == 1.0
     assert rec == 1.0          # both GT songs surfaced; no-audio song still counts
+    assert ndcg == 1.0

@@ -78,21 +78,19 @@ class HybridRerankerService:
         return any(getattr(target, name) is not None for name in cls._AUDIO_FEATURE_ORDER)
 
     def _audio_similarity(self, target: PromptAudioFeatures, cand_audio: AudioFeatures) -> float:
-        # Alternative: 1.0 - sum(abs(p - c)) / k — Manhattan inverted; cheaper but ignores direction.
-        # Score only the axes the prompt actually implied; silent axes drop out entirely
-        # (rather than being treated as 0, which would penalise candidates without cause).
+        # Normalized inverted Euclidean distance (Clase 5, SIMILITUD): audio features are
+        # absolute values in [0,1] where the *value* is the signal, so we measure closeness
+        # in value — not cosine direction, which is degenerate here (a single positive axis,
+        # or a "low" target vs a "high" song, both yield cosine ~1.0 and rank nothing).
+        # Score only the axes the prompt implied; silent axes drop out entirely.
         dims = [(getattr(target, n), getattr(cand_audio, n)) for n in self._AUDIO_FEATURE_ORDER
                 if getattr(target, n) is not None]
         if not dims:
             return 0.0
-        p_vec = [p for p, _ in dims]
-        c_vec = [c for _, c in dims]
-        dot = sum(p * c for p, c in zip(p_vec, c_vec))
-        norm_p = sqrt(sum(p * p for p in p_vec))
-        norm_c = sqrt(sum(c * c for c in c_vec))
-        if norm_p == 0.0 or norm_c == 0.0:
-            return 0.0
-        return max(0.0, dot / (norm_p * norm_c))
+        # each axis is in [0,1] -> max distance over n axes is sqrt(n); divide it out so
+        # audio_sim = 1 - RMSE stays in [0,1]: 1.0 = exact match, 0.0 = maximally far.
+        rmse = sqrt(sum((p - c) ** 2 for p, c in dims) / len(dims))
+        return max(0.0, 1.0 - rmse)
 
     def _profile_affinity(self, cand: CandidateSong, profile: UserProfileData) -> float:
         # Alternative: step function — 1.0 if artist in favs else 0.5 if any genre overlaps else 0.0.

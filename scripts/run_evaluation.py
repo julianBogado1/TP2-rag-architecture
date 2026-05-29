@@ -42,13 +42,14 @@ from app.services.retrieval.vector_retrieval_service import VectorRetrievalServi
 from app.metrics import (
     context_precision_at_k,
     recall_at_k,
+    ndcg_at_k,
     faithfulness_score,
     answer_relevance_score,
 )
 
 GT_PATH = Path(__file__).parent.parent / "data" / "gt_test_cases.json"
 RESULTS_PATH = Path(__file__).parent.parent / "data" / "evaluation_results.json"
-K = 10
+K = settings.eval_k  # @K window for the metrics; override with EVAL_K in .env
 
 
 def audio_bearing(top_songs: list) -> list:
@@ -61,14 +62,18 @@ def audio_bearing(top_songs: list) -> list:
     return [s for s in top_songs if s.metadata.audio_features is not None]
 
 
-def score_case(kind: str, top_songs: list, gt_ids: set, k: int) -> tuple[float, float]:
-    """Compute (context_precision@k, recall@k) for one case.
+def score_case(kind: str, top_songs: list, gt_ids: set, k: int) -> tuple[float, float, float]:
+    """Compute (context_precision@k, recall@k, ndcg@k) for one case over the eligible pool.
 
     audio cases score over the audio-bearing subset; genre cases score over all
-    returned songs (relevance is decided by the GT id set).
+    returned songs (relevance is decided by the GT id set). Recall is capped at the
+    pool size so audio cases aren't penalised for top-K slots taken by no-audio songs.
     """
     scored = audio_bearing(top_songs) if kind == "audio" else top_songs
-    return context_precision_at_k(scored, gt_ids, k), recall_at_k(scored, gt_ids, k)
+    cp = context_precision_at_k(scored, gt_ids, k)
+    rec = recall_at_k(scored, gt_ids, k, pool_size=len(scored))
+    ndcg = ndcg_at_k(scored, gt_ids, k)
+    return cp, rec, ndcg
 
 
 def build_services():
@@ -129,12 +134,16 @@ def main() -> None:
         return
 
     test_cases = json.loads(GT_PATH.read_text())
-    print(f"Loaded {len(test_cases)} test cases\n")
+    print(f"Loaded {len(test_cases)} test cases (eval @K={K})\n")
+    if K > settings.output_top_n:
+        print(f"WARNING: EVAL_K={K} > OUTPUT_TOP_N={settings.output_top_n}; the pipeline "
+              f"returns only {settings.output_top_n} songs, so ranks beyond that are empty. "
+              f"Raise OUTPUT_TOP_N to match.\n")
 
     svc = build_services()
 
     results = []
-    header = f"{'Label':<16} {'Kind':<6} {'CP@K':>6} {'Rec@K':>6} {'Faith':>6} {'AnsRel':>7}"
+    header = f"{'Label':<16} {'Kind':<6} {'CP@K':>6} {'Rec@K':>6} {'NDCG':>6} {'Faith':>6} {'AnsRel':>7}"
     print(header)
     print("-" * len(header))
 
@@ -152,11 +161,11 @@ def main() -> None:
                     print(f"{label:<16} {kind:<6} — no results")
                     continue
 
-                cp, rec = score_case(kind, top_songs, gt_ids, K)
+                cp, rec, ndcg = score_case(kind, top_songs, gt_ids, K)
                 faith = faithfulness_score(response, top_songs, svc["llm"])
                 ar = answer_relevance_score(prompt, response, svc["embedder"], svc["llm"])
 
-                print(f"{label:<16} {kind:<6} {cp:>6.3f} {rec:>6.3f} {faith:>6.3f} {ar:>7.3f}")
+                print(f"{label:<16} {kind:<6} {cp:>6.3f} {rec:>6.3f} {ndcg:>6.3f} {faith:>6.3f} {ar:>7.3f}")
 
                 results.append({
                     "label": label,
@@ -164,6 +173,7 @@ def main() -> None:
                     "prompt": prompt,
                     "context_precision_at_k": round(cp, 4),
                     "recall_at_k": round(rec, 4),
+                    "ndcg_at_k": round(ndcg, 4),
                     "faithfulness": round(faith, 4),
                     "answer_relevance": round(ar, 4),
                 })
@@ -191,9 +201,10 @@ def _print_avg(name: str, rows: list[dict], header: str) -> None:
     n = len(rows)
     avg_cp = sum(r["context_precision_at_k"] for r in rows) / n
     avg_rec = sum(r["recall_at_k"] for r in rows) / n
+    avg_ndcg = sum(r["ndcg_at_k"] for r in rows) / n
     avg_faith = sum(r["faithfulness"] for r in rows) / n
     avg_ar = sum(r["answer_relevance"] for r in rows) / n
-    print(f"{name:<16} {'':<6} {avg_cp:>6.3f} {avg_rec:>6.3f} {avg_faith:>6.3f} {avg_ar:>7.3f}")
+    print(f"{name:<16} {'':<6} {avg_cp:>6.3f} {avg_rec:>6.3f} {avg_ndcg:>6.3f} {avg_faith:>6.3f} {avg_ar:>7.3f}")
 
 
 if __name__ == "__main__":

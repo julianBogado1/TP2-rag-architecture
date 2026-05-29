@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     aggregator_max_evidence_chunks: int = 3
     selector_max_per_artist: int = 2
 
+    # Evaluation: the @K window for CP@K / Rec@K / NDCG@K (scripts/run_evaluation.py).
+    # Keep eval_k <= output_top_n, otherwise the pipeline returns fewer songs than the
+    # metric window and the extra ranks are simply empty.
+    eval_k: int = 10
+
     # Default ranking weights
     default_w_lyrics: float = 0.55
     default_w_audio: float = 0.30

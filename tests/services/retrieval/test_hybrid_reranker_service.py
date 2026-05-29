@@ -154,3 +154,38 @@ def test_target_with_some_nulls_does_not_raise():
                                  acousticness=None, instrumentalness=None, tempo_norm=0.5)
     # Just exercising the code path — must not raise on None axes.
     svc.rerank([_candidate()], _request(audio=audio))
+
+
+# --- Audio similarity: Euclidean, not cosine ------------------------------
+
+def _audio(**axes):
+    base = dict(valence=0.5, energy=0.5, danceability=0.5,
+                acousticness=0.5, instrumentalness=0.5, tempo_norm=0.5)
+    base.update(axes)
+    return AudioFeatures(**base)
+
+
+def test_audio_sim_exact_match_is_one():
+    svc = HybridRerankerService()
+    target = PromptAudioFeatures(valence=0.8)
+    assert svc._audio_similarity(target, _audio(valence=0.8)) == 1.0
+
+
+def test_audio_sim_discriminates_low_target():
+    # The case cosine got wrong: a "low valence" prompt must score a low-valence song
+    # higher than a high-valence one (cosine gave both ~1.0).
+    svc = HybridRerankerService()
+    target = PromptAudioFeatures(valence=0.1)
+    near = svc._audio_similarity(target, _audio(valence=0.1))
+    far  = svc._audio_similarity(target, _audio(valence=0.9))
+    assert near > far
+    assert near == 1.0
+
+
+def test_audio_sim_single_axis_discriminates_high_vs_low():
+    svc = HybridRerankerService()
+    target = PromptAudioFeatures(acousticness=0.9)
+    high = svc._audio_similarity(target, _audio(acousticness=0.9))
+    low  = svc._audio_similarity(target, _audio(acousticness=0.1))
+    assert high == 1.0
+    assert low < high
