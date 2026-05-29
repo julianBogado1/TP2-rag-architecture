@@ -7,6 +7,7 @@ second ranking signal. FastAPI + MongoDB + Pinecone + OpenAI `gpt-4o-mini`.
 
 > **Full architecture, diagrams and workflows:** see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 > Worked metric examples: [`docs/metrics.md`](docs/metrics.md).
+> How the evaluation metrics evolved (with charts): [`docs/metrics-evolution-2026-05-29.md`](docs/metrics-evolution-2026-05-29.md).
 
 # Setup
 
@@ -203,7 +204,7 @@ Pipeline stages (see `docs/2026-05-24-rag-recommendation-pipeline-example.md` fo
 4. `QueryEmbedderService` — embeds the cleaned `semantic_query` with the same model used at index time.
 5. `VectorRetrievalService` — Pinecone search → JSON metadata parse → Python filtering.
 6. `CandidateAggregatorService` — groups chunks by song, fetches evidence lyrics from Mongo.
-7. `HybridRerankerService` — weighted-sum scoring (lyrics + audio + profile + popularity + recency).
+7. `HybridRerankerService` — additive weighted-sum scoring (lyrics + audio + profile + popularity + recency); a missing axis contributes 0 (no weight redistribution). Audio similarity is a **normalized inverted Euclidean** distance over the prompt-implied axes (not cosine — cosine can't distinguish "low" vs "high" or single-axis targets).
 8. `TopNSelectorService` — sort, dedup by title, cap per artist.
 9. `ResponseGeneratorService` — OpenAI structured-output → `RecommendationResponse`. **Enabled by default** (`app/main.py` constructs it with `skip_llm=False`): OpenAI writes a short opener plus a per-song explanation citing evidence lyrics and matched moods. Construct the service with `skip_llm=True` to synthesise the response locally (no OpenAI call) — each `recommendation` then gets `explanation=""` and `matched_mood`/`matched_audio_features` derived from `PromptScore` fields > 0.5.
 
@@ -233,7 +234,11 @@ Prints the full `RecommendationResponse` JSON, including per-song `explanation` 
 
 # Evaluation
 
-Four metrics evaluate the pipeline end-to-end: **Context Precision@K** and **Recall@K** measure retrieval quality; **Faithfulness** and **Answer Relevance** measure generation quality. See [docs/metrics.md](docs/metrics.md) for formulas and examples.
+Five metrics evaluate the pipeline end-to-end: **Context Precision@K**, **Recall@K** and **NDCG@K** measure retrieval/ranking quality; **Faithfulness** and **Answer Relevance** measure generation quality. See [docs/metrics.md](docs/metrics.md) for formulas and [docs/metrics-evolution-2026-05-29.md](docs/metrics-evolution-2026-05-29.md) for how they were tuned.
+
+Ground truth has **two families**, each test case tagged with a `kind`:
+- **audio** — relevance = a soft audio threshold (`valence>0.6` Happy, `energy<0.4` Calm, …); evaluated **only against songs that have audio features**.
+- **genre** — one case per canonical genre (`pop, rap, rock, rb, country, misc`); relevance = `tag` membership ("ask for pop → get pop"); covers audio and no-audio songs.
 
 ### Prerequisites
 
@@ -243,17 +248,17 @@ Four metrics evaluate the pipeline end-to-end: **Context Precision@K** and **Rec
 
 ### Step 1 — Build ground truth
 
-Queries MongoDB audio features to label eligible songs per mood category and creates a neutral eval user with no preferences (to isolate retrieval quality from profile bias).
+Builds the audio + genre test cases from MongoDB, intersects each GT set with the indexed-ids file, and creates a neutral eval user with no preferences (to isolate retrieval quality from profile bias).
 
 ```bash
 .venv/bin/python scripts/build_gt.py
 ```
 
-Output: `data/gt_test_cases.json` — one entry per category with the list of `gt_song_ids`.
+Output: `data/gt_test_cases.json` — one entry per case with its `kind` and list of `gt_song_ids`.
 
 ### Step 2 — Run evaluation
 
-Runs the full recommendation pipeline for each test case and computes all four metrics.
+Runs the full recommendation pipeline for each test case and computes all five metrics, **kind-aware**: audio cases are scored over the audio-bearing subset of the top-K; genre cases over all returned songs. Reports per-kind and overall averages.
 
 ```bash
 .venv/bin/python scripts/run_evaluation.py
@@ -261,18 +266,25 @@ Runs the full recommendation pipeline for each test case and computes all four m
 
 Output: printed metrics table + `data/evaluation_results.json`.
 
+Tune the evaluation window and retrieval depth from `.env` (no code edits):
+
+```
+RETRIEVAL_TOP_K=150   # candidate pool the reranker reorders (lever for surfacing audio songs)
+OUTPUT_TOP_N=10       # songs the pipeline returns (must be >= EVAL_K)
+EVAL_K=10             # the @K window for CP@K / Rec@K / NDCG@K
+```
+
 Example output (illustrative numbers, not a measured run):
 
 ```
-Label          CP@K  Rec@K  Faith AnsRel
------------------------------------------
-Happy         0.820  0.600  0.950  0.880
-Sad           0.740  0.550  0.900  0.850
-Energetic     0.860  0.700  0.980  0.910
-Calm          0.780  0.580  0.920  0.870
-Danceable     0.800  0.620  0.940  0.860
-Acoustic      0.720  0.530  0.910  0.840
-Instrumental  0.690  0.510  0.890  0.820
------------------------------------------
-AVERAGE       0.773  0.584  0.927  0.861
+Label            Kind     CP@K  Rec@K   NDCG  Faith  AnsRel
+-----------------------------------------------------------
+Happy            audio   1.000  0.500  0.481  1.000   0.632
+Sad              audio   0.838  0.580  0.668  1.000   0.633
+Calm             audio   0.812  0.450  0.420  1.000   0.520
+Genre:pop        genre   1.000  1.000  1.000  0.900   0.591
+Genre:rap        genre   1.000  1.000  1.000  1.000   0.520
+-----------------------------------------------------------
+avg [audio]              0.90+  0.50+  0.50+  0.94    0.55
+avg [genre]              1.000  1.000  1.000  0.90    0.50
 ```
