@@ -16,3 +16,4 @@ pinecone==9.0.1
 sentence-transformers==5.5.1
 tqdm==4.67.3
 openai==1.99.0
+matplotlib==3.10.9

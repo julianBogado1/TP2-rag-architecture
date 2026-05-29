@@ -6,6 +6,8 @@ from app.core.exceptions import (
 from app.services.retrieval.recommendation_orchestrator import RecommendationOrchestrator
 from app.models.recommendation_response import RecommendationResponse
 
+RECOMMEND_MAX_RETRIES = 3       # retries after the first attempt
+
 
 class RecommendRequestBody(BaseModel):
     user_id: str
@@ -18,7 +20,12 @@ def build_recommendation_router(orchestrator: RecommendationOrchestrator) -> API
     @router.post("/recommend", response_model=RecommendationResponse)
     def recommend(body: RecommendRequestBody) -> RecommendationResponse:
         try:
-            return orchestrator.recommend(body.user_id, body.raw_prompt)
+            response = orchestrator.recommend(body.user_id, body.raw_prompt)
+            for _ in range(RECOMMEND_MAX_RETRIES):
+                if response.recommendations:
+                    break
+                response = orchestrator.recommend(body.user_id, body.raw_prompt)
+            return response
         except UserNotFoundError:
             raise HTTPException(404, "User not found")
         except LLMProviderError:
